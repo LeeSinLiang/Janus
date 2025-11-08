@@ -176,11 +176,18 @@ export function applyGraphDiff(
 
 /**
  * Position new nodes intelligently based on existing nodes
+ * Also marks them as pending approval
  */
 function positionNewNodes(existingNodes: Node[], newNodes: Node[]): Node[] {
   if (existingNodes.length === 0) {
-    // No existing nodes, use positions from parser
-    return newNodes;
+    // No existing nodes, use positions from parser and mark as pending
+    return newNodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        pendingApproval: true, // Mark new nodes for approval
+      },
+    }));
   }
 
   // Find the bottom-most node
@@ -188,12 +195,16 @@ function positionNewNodes(existingNodes: Node[], newNodes: Node[]): Node[] {
   const VERTICAL_SPACING = 300;
   const HORIZONTAL_SPACING = 400;
 
-  // Position new nodes in a row below existing nodes
+  // Position new nodes in a row below existing nodes and mark as pending
   return newNodes.map((node, index) => ({
     ...node,
     position: {
       x: 50 + (index * HORIZONTAL_SPACING),
       y: maxY + VERTICAL_SPACING,
+    },
+    data: {
+      ...node.data,
+      pendingApproval: true, // Mark new nodes for approval
     },
   }));
 }

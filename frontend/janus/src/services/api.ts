@@ -54,6 +54,7 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
     subgraph "Phase 2"
         NODE4[<title>Youtube Shorts</title><description>Create an Instagram carousel post (5 slides) highlighting our top features.</description>]
         NODE5[<title>Video Marketing</title><description>Create an Instagram carousel post (5 slides) highlighting our top features.</description>]
+        NODE6[<title>Blog Post</title><description>Create an Instagram carousel post (5 slides) highlighting our top features.</description>]
     end
 
 
@@ -64,6 +65,7 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
     NODE3 --> NODE5
     NODE4 <--> NODE5
     NODE2 <--> NODE3
+    NODE5 --> NODE6
 `,
     metrics: [
       { node_id: 'NODE1', likes: 124, impressions: 1570, retweets: 45 },

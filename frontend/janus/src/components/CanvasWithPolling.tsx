@@ -31,6 +31,50 @@ export default function CanvasWithPolling() {
     useMockData: true, // Set to false when connecting to real backend
   });
 
+  // Approve a pending node
+  const handleApproveNode = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  pendingApproval: false, // Remove pending state
+                },
+              }
+            : node
+        )
+      );
+    },
+    [setNodes]
+  );
+
+  // Reject a pending node (remove it and its connected edges)
+  const handleRejectNode = useCallback(
+    (nodeId: string) => {
+      // Remove the node
+      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+
+      // Remove all edges connected to this node
+      setEdges((eds) =>
+        eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
+      );
+    },
+    [setNodes, setEdges]
+  );
+
+  // Add handlers to node data
+  const nodesWithHandlers = nodes.map((node) => ({
+    ...node,
+    data: {
+      ...node.data,
+      onApprove: () => handleApproveNode(node.id),
+      onReject: () => handleRejectNode(node.id),
+    },
+  }));
+
   // Handle node changes (dragging, etc.)
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -82,7 +126,7 @@ export default function CanvasWithPolling() {
     <div className="relative h-full w-full bg-gray-50">
       {/* ReactFlow Canvas */}
       <ReactFlow
-        nodes={nodes}
+        nodes={nodesWithHandlers}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -98,7 +142,7 @@ export default function CanvasWithPolling() {
       {/* Floating ChatBox at the bottom */}
       <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
         <div className="pointer-events-auto w-full max-w-[50%] rounded-xl border border-zinc-200 bg-white shadow-lg">
-          <ChatBox nodes={nodes} />
+          <ChatBox nodes={nodesWithHandlers} />
         </div>
       </div>
     </div>
