@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from .models import PostMetrics, IGMetrics
+from agents.models import Post
 from .models import PostMetrics
 from agents.models import Post, ContentVariant
 
@@ -13,6 +15,12 @@ class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ('pk', 'title', 'description', 'next_posts', 'phase')
+
+
+class IGMetricsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IGMetrics
+        fields = '__all__'
 
     def get_description(self, obj):
         """Return selected variant's content if exists, otherwise return post description"""
