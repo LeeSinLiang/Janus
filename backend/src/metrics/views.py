@@ -14,11 +14,30 @@ from django.core.cache import cache
 
 
 # Create your views here.
+def getMetricsDB():
+	posts = Post.objects.filter(status="published").select_related('metrics')
+	out = {}
+	for post in posts:
+		m = getattr(post, "metrics", None)
+		out[post.pk] = {
+			"likes": m.likes if m else 0,
+			"impressions": m.impressions if m else 0,
+			"retweets": m.retweets if m else 0,
+		}
+	return out
+
+
+
 @api_view(['GET'])
 def nodesJSON(request):
-	qs = Post.objects.filter(campaign=Campaign.objects.first())
-	serializer = PostSerializer(qs, many=True)
-	return Response(serializer.data)
+	posts = Post.objects.filter(campaign=Campaign.objects.first())
+	serializer = PostSerializer(posts, many=True)
+	metricsData = getMetricsDB(posts_qs=posts)
+
+	return Response({
+		"diagram": serializer.data,
+		"metrics": metricsData
+	}, status=200)
 
 @api_view(['POST'])
 def createXPost(request):
