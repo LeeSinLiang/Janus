@@ -61,7 +61,7 @@ class Post(models.Model):
 		('analyzed', 'Analyzed'),
 	]
 
-	post_id = models.CharField(max_length=255, unique=True, db_index=True)
+	post_id = models.CharField(max_length=255) 
 	campaign = models.ForeignKey(
 		Campaign,
 		on_delete=models.CASCADE,
