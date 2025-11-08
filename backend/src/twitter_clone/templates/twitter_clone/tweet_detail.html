@@ -1,0 +1,114 @@
+{% extends "twitter_clone/base.html" %}
+
+{% block title %}Tweet by @{{ tweet.author.username }} - Twitter Clone{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="{% url 'clone_home' %}" class="action-btn" style="display: inline-flex;">
+        ← Back to Home
+    </a>
+</div>
+
+{% if success_message %}
+<div class="alert alert-success">
+    {{ success_message }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+<!-- Main Tweet -->
+<div class="tweet-card">
+    <div class="tweet-header">
+        <div>
+            <span class="tweet-author">@{{ tweet.author.username }}</span>
+            <span class="tweet-time"> · {{ tweet.created_at|date:"F d, Y" }} at {{ tweet.created_at|time:"g:i A" }}</span>
+        </div>
+    </div>
+
+    <div class="tweet-text" style="font-size: 18px;">{{ tweet.text }}</div>
+
+    {% if tweet.media_image %}
+    <div class="tweet-media">
+        <img src="{{ tweet.media_image.url }}" alt="Tweet image">
+    </div>
+    {% endif %}
+
+    {% if tweet.media_video %}
+    <div class="tweet-media">
+        <video controls>
+            <source src="{{ tweet.media_video.url }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    {% endif %}
+
+    <div class="stats" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #38444d;">
+        <div class="stat-item">
+            <strong>{{ tweet.get_like_count }}</strong> likes
+        </div>
+        <div class="stat-item">
+            <strong>{{ tweet.get_retweet_count }}</strong> retweets
+        </div>
+        <div class="stat-item">
+            <strong>{{ comments.count }}</strong> comments
+        </div>
+        <div class="stat-item">
+            <strong>{{ tweet.get_impression_count }}</strong> impressions
+        </div>
+    </div>
+
+    <div class="tweet-actions">
+        <form method="POST" action="{% url 'clone_like_tweet_ui' tweet.tweet_id %}" style="display: inline;" onsubmit="return submitAction(this);">
+            {% csrf_token %}
+            <button type="submit" class="action-btn {% if is_liked %}liked{% endif %}">
+                ❤️ Like
+            </button>
+        </form>
+
+        <form method="POST" action="{% url 'clone_retweet_ui' tweet.tweet_id %}" style="display: inline;" onsubmit="return submitAction(this);">
+            {% csrf_token %}
+            <button type="submit" class="action-btn {% if is_retweeted %}retweeted{% endif %}">
+                🔄 Retweet
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Comment Form -->
+<div class="comment-section">
+    <h3 style="margin-bottom: 15px;">Add a Comment</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-group">
+            <textarea name="comment_text" placeholder="Tweet your reply..." required maxlength="280"></textarea>
+            <div class="char-counter">0/280</div>
+        </div>
+        <button type="submit" class="btn">Reply</button>
+    </form>
+</div>
+
+<!-- Comments List -->
+{% if comments %}
+<div class="comment-section">
+    <h3 style="margin-bottom: 15px;">Comments ({{ comments.count }})</h3>
+    {% for comment in comments %}
+    <div class="comment">
+        <div class="comment-author">@{{ comment.user.username }}</div>
+        <div class="comment-text">{{ comment.text }}</div>
+        <div class="comment-time">{{ comment.created_at|timesince }} ago</div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="comment-section">
+    <div class="empty-state" style="padding: 40px 20px;">
+        <p>No comments yet. Be the first to reply!</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

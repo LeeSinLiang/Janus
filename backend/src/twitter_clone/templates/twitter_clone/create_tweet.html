@@ -1,0 +1,67 @@
+{% extends "twitter_clone/base.html" %}
+
+{% block title %}Create Tweet - Twitter Clone{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 0 auto;">
+    <h2 style="margin-bottom: 20px;">Create a Tweet</h2>
+
+    {% if error %}
+    <div class="alert alert-error">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="text">What's happening?</label>
+            <textarea name="text" id="text" placeholder="Share your thoughts..." required maxlength="280"></textarea>
+            <div class="char-counter">0/280</div>
+        </div>
+
+        <div class="form-group">
+            <label for="media">Add an image (optional)</label>
+            <input type="file" name="media" id="media" accept="image/*">
+        </div>
+
+        <div class="form-group">
+            <label for="media_video">Add a video (optional)</label>
+            <input type="file" name="media_video" id="media_video" accept="video/*">
+            <small style="color: #8899a6; display: block; margin-top: 5px;">
+                Note: You can upload either an image or a video, not both.
+            </small>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 30px;">
+            <button type="submit" class="btn">Post Tweet</button>
+            <a href="{% url 'clone_home' %}" class="btn btn-secondary" style="text-decoration: none; display: inline-block; text-align: center;">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Prevent uploading both image and video
+    const imageInput = document.getElementById('media');
+    const videoInput = document.getElementById('media_video');
+
+    imageInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            videoInput.value = '';
+            videoInput.disabled = true;
+        } else {
+            videoInput.disabled = false;
+        }
+    });
+
+    videoInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            imageInput.value = '';
+            imageInput.disabled = true;
+        } else {
+            imageInput.disabled = false;
+        }
+    });
+</script>
+{% endblock %}
