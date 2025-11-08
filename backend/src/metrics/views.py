@@ -12,26 +12,6 @@ from time import time
 from django.core.cache import cache
 
 
-CACHE_TTL = 120
-def should_skip_fetch(tweet_id):
-	key = f"x:last-fetch:{tweet_id}"
-	last = cache.get(key)
-	if last and time() - last < CACHE_TTL:
-		return True
-	cache.set(key, time(), CACHE_TTL)
-	return False
-
-auth = OAuth1(
-	settings.X_API_KEY,
-	settings.X_API_SECRET,
-	settings.X_ACCESS_TOKEN,
-	settings.X_ACCESS_TOKEN_SECRET,
-)
-
-POLL_TIMEOUT_SEC = 30
-POLL_INTERVAL_SEC = 1.0
-GRAPH_VERSION = "v23.0"
-
 
 # Create your views here.
 @api_view(['GET'])
@@ -221,20 +201,3 @@ def rejectNode(request):
 		return Response({
 			"error": f"Post with pk={pk} not found"
 		}, status=404)
-
-
-
-
-########################################################################
-#                               INSTAGRAM
-#########################################################################
-def createIGPost(request):
-	pk = request.data.get("pk")
-	if not pk:
-		return Response({"error": "Missing 'pk' field"}, status=400)
-	
-	post = Post.objects.get(pk=pk)
-	variantId = post.selected_variant
-	selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=post)
-	text = selectedVariant.content
-
