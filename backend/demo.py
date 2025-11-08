@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 """
-Janus Multi-Agent System Demo
+Janus Multi-Agent System Demo - 3 Scenario Workflow
 
-Demonstrates the complete workflow of the Janus GTM OS.
+Demonstrates the complete workflow of the Janus GTM OS:
+- Scenario 1: Strategy Planning → Mermaid Diagram → Save to DB
+- Scenario 2: Generate A/B Content for all nodes
+- Scenario 3: Metrics Analysis → Improved Content
+
 Make sure to set GOOGLE_API_KEY in your .env file before running.
 """
 
@@ -10,6 +14,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Dict, List
 
 # Add src to path for imports
 src_path = Path(__file__).parent / "src"
@@ -20,156 +25,377 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "janus.settings")
 import django
 django.setup()
 
-from src.agents import (
-    create_orchestrator,
-    create_strategy_planner,
-    create_content_creator,
-    create_metrics_analyzer,
-    state
-)
+from agents.strategy_planner import create_strategy_planner
+from agents.content_creator import create_content_creator
+from agents.metrics_analyzer import create_metrics_analyzer
+from agents.mermaid_parser import parse_mermaid_diagram
+from agents.models import Campaign, Post, ContentVariant
 
 
 def print_section(title: str):
     """Print a formatted section header"""
-    print("\n" + "=" * 70)
+    print("\n" + "=" * 80)
     print(f"  {title}")
-    print("=" * 70 + "\n")
+    print("=" * 80 + "\n")
 
 
-def demo_orchestrator():
-    """Demo the orchestrator coordinating all agents"""
-    print_section("🎯 ORCHESTRATOR DEMO - Complete Workflow")
-
-    orchestrator = create_orchestrator()
-
-    # Example 1: Create campaign strategy
-    print("📋 1. Creating Campaign Strategy...")
-    result = orchestrator.execute(
-        "Create a marketing strategy for Janus, an AI-powered GTM OS for technical founders. "
-        "Goal: Launch and get first 100 users in 4 weeks using X and ProductHunt."
-    )
-    print(f"✅ Strategy created!")
-    print(f"Output preview: {result.get('output', '')[:300]}...\n")
-
-    # Example 2: Generate content
-    print("✍️  2. Generating Content with A/B Variants...")
-    result = orchestrator.execute(
-        "Generate tweet content announcing our product launch with A/B variants"
-    )
-    print(f"✅ Content generated!")
-    print(f"Output preview: {result.get('output', '')[:300]}...\n")
-
-    # Example 3: Analyze metrics
-    print("📊 3. Analyzing Platform Metrics...")
-    result = orchestrator.execute(
-        "Analyze platform insights and recommend optimal posting times"
-    )
-    print(f"✅ Analysis complete!")
-    print(f"Output preview: {result.get('output', '')[:300]}...\n")
+def print_subsection(title: str):
+    """Print a formatted subsection header"""
+    print("\n" + "-" * 80)
+    print(f"  {title}")
+    print("-" * 80 + "\n")
 
 
-def demo_individual_agents():
-    """Demo individual agents working independently"""
-    print_section("🤖 INDIVIDUAL AGENTS DEMO")
+def load_placeholder_metrics() -> Dict:
+    """Load placeholder metrics from JSON file"""
+    metrics_file = Path(__file__).parent / "src" / "agents" / "data" / "placeholder_metrics.json"
+    with open(metrics_file, 'r') as f:
+        return json.load(f)
 
-    # 1. Strategy Planner
-    print("📋 Strategy Planner Agent")
-    print("-" * 70)
+
+def scenario_1_strategy_planning(product_description: str, gtm_goals: str) -> tuple[str, Campaign]:
+    """
+    Scenario 1: Strategy Planning
+
+    Flow:
+    1. User provides product description and GTM goals
+    2. Strategy Planner creates mermaid diagram with 3 phases
+    3. Parse mermaid diagram
+    4. Save to database (Campaign + Posts with connections)
+    5. Return diagram to user
+
+    Returns:
+        tuple: (mermaid_diagram, campaign_object)
+    """
+    print_section("📋 SCENARIO 1: STRATEGY PLANNING")
+
+    # Step 1: Create strategy with Strategy Planner
+    print("Step 1: Generating GTM strategy with 3 phases...")
     strategy_agent = create_strategy_planner()
+    strategy_output = strategy_agent.execute(product_description, gtm_goals)
+    mermaid_diagram = strategy_output.diagram
 
-    strategy = strategy_agent.create_strategy(
-        product_info="Janus - AI GTM OS for technical founders",
-        campaign_goal="Launch and acquire first 100 users",
-        context={"timeline": "4 weeks", "budget": "low", "channels": ["X", "ProductHunt"]}
+    print("✅ Strategy created!")
+    print("\nMermaid Diagram:")
+    print("-" * 80)
+    print(mermaid_diagram)
+    print("-" * 80)
+
+    # Step 2: Parse mermaid diagram
+    print("\nStep 2: Parsing mermaid diagram...")
+    parsed_data = parse_mermaid_diagram(mermaid_diagram)
+
+    print(f"✅ Parsed {len(parsed_data['nodes'])} nodes and {len(parsed_data['connections'])} connections")
+    print(f"\nNodes by phase:")
+    phase_counts = {}
+    for node in parsed_data['nodes']:
+        phase = node['phase']
+        phase_counts[phase] = phase_counts.get(phase, 0) + 1
+    for phase, count in sorted(phase_counts.items()):
+        print(f"  - {phase}: {count} nodes")
+
+    # Step 3: Save to database
+    print("\nStep 3: Saving to database...")
+
+    # Create campaign
+    campaign = Campaign.objects.create(
+        campaign_id=f"campaign_{Campaign.objects.count() + 1}",
+        name="GTM Campaign",
+        description=product_description,
+        strategy=mermaid_diagram,
+        phase="strategizing"
     )
+    print(f"✅ Created Campaign: {campaign.campaign_id}")
 
-    print(f"Campaign: {strategy['campaign_name']}")
-    print(f"Goal: {strategy['campaign_goal']}")
-    print(f"Phases: {len(strategy['phases'])}")
-    for i, phase in enumerate(strategy['phases'], 1):
-        print(f"  {i}. {phase['phase_name']} ({phase['duration']})")
-    print(f"Campaign ID: {strategy['campaign_id']}")
+    # Create posts from nodes
+    node_to_post = {}  # Map node IDs to Post objects for later linking
 
-    # 2. Content Creator
-    print("\n✍️  Content Creator Agent")
-    print("-" * 70)
+    for node in parsed_data['nodes']:
+        post = Post.objects.create(
+            post_id=f"post_{node['id']}",
+            campaign=campaign,
+            title=node['title'],
+            description=node['description'],
+            phase=node['phase'] if node['phase'] in ['Phase 1', 'Phase 2', 'Phase 3'] else 'Phase 1',
+            status='draft'
+        )
+        node_to_post[node['id']] = post
+        print(f"  Created Post: {node['id']} - {node['title'][:50]}...")
+
+    # Link posts using next_posts based on connections
+    print(f"\nStep 4: Linking posts based on {len(parsed_data['connections'])} connections...")
+    for connection in parsed_data['connections']:
+        from_node = connection['from']
+        to_node = connection['to']
+
+        if from_node in node_to_post and to_node in node_to_post:
+            from_post = node_to_post[from_node]
+            to_post = node_to_post[to_node]
+            from_post.next_posts.add(to_post)
+            print(f"  Linked: {from_node} → {to_node}")
+
+    print(f"\n✅ Scenario 1 Complete!")
+    print(f"   Campaign ID: {campaign.campaign_id}")
+    print(f"   Total Posts: {campaign.posts.count()}")
+    print(f"   Strategy saved to database")
+
+    return mermaid_diagram, campaign
+
+
+def scenario_2_generate_ab_content(campaign: Campaign, product_info: str):
+    """
+    Scenario 2: Generate A/B Content for ALL nodes
+
+    Flow:
+    1. Get all posts from campaign
+    2. For each post, generate A/B content using Content Creator
+    3. Save ContentVariant A and B for each post
+
+    Args:
+        campaign: Campaign object from Scenario 1
+        product_info: Product description for content generation
+    """
+    print_section("✍️  SCENARIO 2: GENERATE A/B CONTENT FOR ALL NODES")
+
+    content_agent = create_content_creator()
+    posts = campaign.posts.all().order_by('phase', 'post_id')
+
+    print(f"Generating A/B content for {posts.count()} posts...")
+
+    for i, post in enumerate(posts, 1):
+        print(f"\nPost {i}/{posts.count()}: {post.title}")
+        print(f"Phase: {post.phase} | Description: {post.description[:60]}...")
+
+        # Generate A/B content
+        content_output = content_agent.execute(
+            title=post.title,
+            description=post.description,
+            product_info=product_info
+        )
+
+        # Create ContentVariant A
+        variant_a = ContentVariant.objects.create(
+            post=post,
+            variant_label='A',
+            content=content_output.A,
+            platform='X',
+            status='draft'
+        )
+
+        # Create ContentVariant B
+        variant_b = ContentVariant.objects.create(
+            post=post,
+            variant_label='B',
+            content=content_output.B,
+            platform='X',
+            status='draft'
+        )
+
+        print(f"  ✅ Variant A ({len(content_output.A)} chars): {content_output.A[:60]}...")
+        print(f"  ✅ Variant B ({len(content_output.B)} chars): {content_output.B[:60]}...")
+
+    print(f"\n✅ Scenario 2 Complete!")
+    print(f"   Generated {posts.count() * 2} content variants (A/B for each post)")
+
+
+def scenario_3_metrics_analysis_and_improvement(campaign: Campaign, product_info: str):
+    """
+    Scenario 3: Metrics Analysis → Improved Content
+
+    Flow:
+    1. Load placeholder metrics from JSON
+    2. Pass to Metrics Analyzer
+    3. Get analyzed_report
+    4. Pass report + old content to Content Creator
+    5. Generate improved A/B variants
+    6. Save new variants
+
+    Args:
+        campaign: Campaign object
+        product_info: Product description
+    """
+    print_section("📊 SCENARIO 3: METRICS ANALYSIS & CONTENT IMPROVEMENT")
+
+    # Step 1: Load placeholder metrics
+    print("Step 1: Loading placeholder metrics...")
+    metrics_data = load_placeholder_metrics()
+    print(f"✅ Loaded metrics for {len(metrics_data['data'])} tweets")
+
+    # Display sample metrics
+    sample_tweet = metrics_data['data'][0]
+    print(f"\nSample Tweet Metrics:")
+    print(f"  Text: {sample_tweet['text'][:60]}...")
+    print(f"  Impressions: {sample_tweet['public_metrics']['impression_count']:,}")
+    print(f"  Likes: {sample_tweet['public_metrics']['like_count']}")
+    print(f"  Engagement Rate: {sample_tweet['engagement_rate']:.2f}%")
+
+    # Step 2: Analyze metrics
+    print("\nStep 2: Analyzing metrics with Metrics Analyzer...")
+    metrics_agent = create_metrics_analyzer()
+    analysis = metrics_agent.execute(metrics_data)
+
+    print("✅ Metrics analyzed!")
+    print("\nAnalyzed Report (first 500 chars):")
+    print("-" * 80)
+    print(analysis.analyzed_report[:500] + "...")
+    print("-" * 80)
+
+    # Step 3: Generate improved content for first 3 posts
+    print("\nStep 3: Generating improved A/B content based on metrics...")
     content_agent = create_content_creator()
 
-    content = content_agent.create_content(
-        request="Create a tweet announcing Janus launch",
-        context={"brand_voice": "technical, friendly", "target_audience": "developers"}
+    posts = campaign.posts.all()[:3]  # Improve first 3 posts as example
+
+    for i, post in enumerate(posts, 1):
+        # Get old content (from existing variants)
+        old_variants = post.variants.all()
+        if not old_variants.exists():
+            print(f"  ⚠️  Post {i}: No existing content to improve, skipping...")
+            continue
+
+        old_content_a = old_variants.filter(variant_label='A').first()
+        old_content = old_content_a.content if old_content_a else ""
+
+        print(f"\nPost {i}: {post.title}")
+        print(f"  Old content: {old_content[:60]}...")
+
+        # Generate improved content
+        improved_output = content_agent.execute_with_metrics(
+            title=post.title,
+            description=post.description,
+            product_info=product_info,
+            old_content=old_content,
+            analyzed_report=analysis.analyzed_report
+        )
+
+        # Update existing variants or create new ones
+        variant_a = old_variants.filter(variant_label='A').first()
+        variant_b = old_variants.filter(variant_label='B').first()
+
+        if variant_a:
+            variant_a.content = improved_output.A
+            variant_a.save()
+        else:
+            variant_a = ContentVariant.objects.create(
+                post=post,
+                variant_label='A',
+                content=improved_output.A,
+                platform='X',
+                status='draft'
+            )
+
+        if variant_b:
+            variant_b.content = improved_output.B
+            variant_b.save()
+        else:
+            variant_b = ContentVariant.objects.create(
+                post=post,
+                variant_label='B',
+                content=improved_output.B,
+                platform='X',
+                status='draft'
+            )
+
+        print(f"  ✅ Improved Variant A: {improved_output.A[:60]}...")
+        print(f"  ✅ Improved Variant B: {improved_output.B[:60]}...")
+
+    print(f"\n✅ Scenario 3 Complete!")
+    print(f"   Improved {posts.count()} posts based on metrics analysis")
+
+
+def run_sequential_demo():
+    """Run all 3 scenarios in sequence"""
+    print("""
+    ╔════════════════════════════════════════════════════════════════════════════╗
+    ║                                                                            ║
+    ║         🚀 JANUS - AI-Powered GTM OS                                      ║
+    ║         Sequential Workflow Demo (Scenario 1 → 2 → 3)                     ║
+    ║                                                                            ║
+    ╚════════════════════════════════════════════════════════════════════════════╝
+    """)
+
+    # Define product info
+    product_description = (
+        "Janus is an AI-powered GTM Operating System designed for technical founders. "
+        "It automates marketing strategy planning, content creation with A/B testing, "
+        "and metrics-driven optimization across social platforms like X and ProductHunt."
     )
+    gtm_goals = "Launch product and acquire first 100 users in 4 weeks using X and ProductHunt"
 
-    print(f"Topic: {content['topic']}")
-    print(f"\n[Variant A - {content['variants'][0]['hook']}]")
-    print(f"{content['variants'][0]['content']}")
-    print(f"Hashtags: {content['variants'][0]['hashtags']}")
-    print(f"\n[Variant B - {content['variants'][1]['hook']}]")
-    print(f"{content['variants'][1]['content']}")
-    print(f"Hashtags: {content['variants'][1]['hashtags']}")
-    print(f"\n💡 Recommendation: {content['recommendation']}")
+    print("Product:", product_description[:80] + "...")
+    print("Goal:", gtm_goals)
 
-    # 3. Metrics Analyzer
-    print("\n📊 Metrics Analyzer Agent")
-    print("-" * 70)
-    metrics_agent = create_metrics_analyzer()
+    try:
+        # Scenario 1: Strategy Planning
+        mermaid_diagram, campaign = scenario_1_strategy_planning(product_description, gtm_goals)
 
-    # Analyze a tweet
-    analysis = metrics_agent.analyze_tweet("tweet_001")
-    print(f"Analyzing tweet_001...")
-    print(f"Analysis output preview: {json.dumps(analysis, indent=2)}")
+        input("\n⏸️  Press Enter to continue to Scenario 2...")
+
+        # Scenario 2: Generate A/B Content
+        scenario_2_generate_ab_content(campaign, product_description)
+
+        input("\n⏸️  Press Enter to continue to Scenario 3...")
+
+        # Scenario 3: Metrics Analysis & Improvement
+        scenario_3_metrics_analysis_and_improvement(campaign, product_description)
+
+        print_section("✅ SEQUENTIAL DEMO COMPLETE")
+        print("All 3 scenarios executed successfully!")
+        print(f"\nFinal Campaign Stats:")
+        print(f"  Campaign ID: {campaign.campaign_id}")
+        print(f"  Total Posts: {campaign.posts.count()}")
+        print(f"  Total Variants: {ContentVariant.objects.filter(post__campaign=campaign).count()}")
+
+    except Exception as e:
+        print(f"\n❌ Error during sequential demo: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
-def demo_state_management():
-    """Demo the state management system"""
-    print_section("💾 STATE MANAGEMENT DEMO")
+def run_independent_demos():
+    """Run each scenario independently with hardcoded data"""
+    print("""
+    ╔════════════════════════════════════════════════════════════════════════════╗
+    ║                                                                            ║
+    ║         🚀 JANUS - AI-Powered GTM OS                                      ║
+    ║         Independent Scenario Demos                                         ║
+    ║                                                                            ║
+    ╚════════════════════════════════════════════════════════════════════════════╝
+    """)
 
-    # Create a campaign
-    campaign = state.create_campaign(
-        campaign_id="demo_campaign_001",
-        name="Demo Product Launch",
-        description="Demo campaign for Janus"
+    product_description = (
+        "Janus is an AI-powered GTM Operating System for technical founders. "
+        "Automates marketing strategy, content creation, and optimization."
     )
-    print(f"✅ Created campaign: {campaign.name}")
-    print(f"   ID: {campaign.campaign_id}")
-    print(f"   Phase: {campaign.phase.value}")
+    gtm_goals = "Launch and get 100 users in 4 weeks via X and ProductHunt"
 
-    # Update campaign strategy
-    mermaid_diagram = """graph TD
-    A[Start] --> B[Phase 1: Awareness]
-    B --> C[Phase 2: Launch]
-    C --> D[Phase 3: Growth]"""
+    try:
+        # Independent Scenario 1
+        print("\n🔹 Running Scenario 1 independently...")
+        _, campaign1 = scenario_1_strategy_planning(product_description, gtm_goals)
 
-    state.update_campaign_strategy("demo_campaign_001", mermaid_diagram)
-    print(f"\n✅ Updated campaign strategy with Mermaid diagram")
+        # Independent Scenario 2 (create new campaign)
+        print("\n🔹 Running Scenario 2 independently...")
+        _, campaign2 = scenario_1_strategy_planning(product_description, gtm_goals)
+        scenario_2_generate_ab_content(campaign2, product_description)
 
-    # Add insights
-    state.add_campaign_insight("demo_campaign_001", "Engagement rate: 3.8% (above average)")
-    state.add_campaign_insight("demo_campaign_001", "Best posting time: 2pm weekdays")
-    print(f"\n✅ Added {len(campaign.insights)} insights to campaign")
+        # Independent Scenario 3 (create new campaign with content)
+        print("\n🔹 Running Scenario 3 independently...")
+        _, campaign3 = scenario_1_strategy_planning(product_description, gtm_goals)
+        scenario_2_generate_ab_content(campaign3, product_description)
+        scenario_3_metrics_analysis_and_improvement(campaign3, product_description)
 
-    # Retrieve campaign
-    retrieved = state.get_campaign("demo_campaign_001")
-    print(f"\n📋 Campaign Details:")
-    print(f"   Name: {retrieved.name}")
-    print(f"   Phase: {retrieved.phase.value}")
-    print(f"   Posts: {len(retrieved.posts)}")
-    print(f"   Insights: {len(retrieved.insights)}")
-    for i, insight in enumerate(retrieved.insights, 1):
-        print(f"     {i}. {insight}")
+        print_section("✅ INDEPENDENT DEMOS COMPLETE")
+        print("All scenarios ran independently!")
+
+    except Exception as e:
+        print(f"\n❌ Error during independent demos: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
 def main():
     """Main demo function"""
-    print("""
-    ╔═══════════════════════════════════════════════════════════════════╗
-    ║                                                                   ║
-    ║         🚀 JANUS - AI-Powered GTM OS                             ║
-    ║         Multi-Agent System Demo                                   ║
-    ║                                                                   ║
-    ╚═══════════════════════════════════════════════════════════════════╝
-    """)
-
     # Check for API key
     if not os.getenv("GOOGLE_API_KEY"):
         print("❌ ERROR: GOOGLE_API_KEY not found in environment variables!")
@@ -180,29 +406,33 @@ def main():
         return
 
     print("✅ Google API Key found!")
-    print("\nThis demo will showcase:")
-    print("  1. Orchestrator coordinating all agents")
-    print("  2. Individual agents working independently")
-    print("  3. State management system")
 
-    try:
-        # Run demos
-        # demo_orchestrator()
-        demo_individual_agents()
-        # demo_state_management()
+    # Choose demo mode
+    print("\nSelect demo mode:")
+    print("  1. Sequential (Scenario 1 → 2 → 3)")
+    print("  2. Independent (Each scenario separately)")
+    print("  3. Both")
 
-        print_section("✅ DEMO COMPLETE")
-        print("All agents are working correctly!")
-        print("\nNext steps:")
-        print("  - Check the README.md for detailed usage")
-        print("  - Explore individual agent files for more examples")
-        print("  - Integrate with your React frontend")
-        print("  - Add real X API credentials for production")
+    choice = input("\nEnter choice (1/2/3) [default: 1]: ").strip() or "1"
 
-    except Exception as e:
-        print(f"\n❌ Error during demo: {str(e)}")
-        import traceback
-        traceback.print_exc()
+    if choice == "1":
+        run_sequential_demo()
+    elif choice == "2":
+        run_independent_demos()
+    elif choice == "3":
+        run_sequential_demo()
+        input("\n⏸️  Press Enter to run independent demos...")
+        run_independent_demos()
+    else:
+        print("Invalid choice. Running sequential demo by default.")
+        run_sequential_demo()
+
+    print("\n" + "=" * 80)
+    print("Next steps:")
+    print("  - Check Django admin to view saved campaigns and posts")
+    print("  - Integrate with React frontend")
+    print("  - Add real X API credentials for production")
+    print("=" * 80 + "\n")
 
 
 if __name__ == "__main__":
