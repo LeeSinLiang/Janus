@@ -1,0 +1,61 @@
+{
+  "diagram": [
+    {
+      "pk": 1,
+      "title": "Instagram post",
+      "description": "Create an Instagram carousel post (5 slides) highlighting our top features. Create an Instagram carousel post.",
+      "next_post": [2, 3]
+    },
+    {
+      "pk": 2,
+      "title": "X post",
+      "description": "Create an Instagram carousel post (5 slides) highlighting our top features.",
+      "next_post": [4, 3]
+    },
+    {
+      "pk": 3,
+      "title": "Instagram Reels",
+      "description": "Create an Instagram carousel post (5 slides) highlighting our top features.",
+      "next_post": [5, 2]
+    },
+    {
+      "pk": 4,
+      "title": "Youtube Shorts",
+      "description": "Create an Instagram carousel post (5 slides) highlighting our top features.",
+      "next_post": [5]
+    },
+    {
+      "pk": 5,
+      "title": "Video Marketing",
+      "description": "Create an Instagram carousel post (5 slides) highlighting our top features.",
+      "next_post": [4]
+    }
+  ], 
+  "metrics": [
+    {
+      "pk": "1",
+      "likes": 124,
+      "impressions": 1570,
+      "retweets": 45
+    },
+    {
+      "pk": "2",
+      "likes": 98,
+      "impressions": 2034,
+      "retweets": 67
+    },
+    {
+      "pk": "3",
+      "likes": 215,
+      "impressions": 3098,
+      "retweets": 120
+    },
+    {
+      "pk": "4",
+      "likes": 56,
+      "impressions": 890,
+      "retweets": 10
+    }
+  ],
+  "changes": false
+}

@@ -107,7 +107,7 @@ export default function ChatBox({
       setMessage('');
     } else {
       // Normal message mode - handle normally (you can implement this later)
-      console.log('Normal message submitted:', message);
+      console.log('Sin is so corny bhai macha:', message);
       setMessage('');
     }
   };

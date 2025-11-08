@@ -1,11 +1,74 @@
-import { GraphResponse, ApiError } from '@/types/api';
+import { DiagramNode, GraphResponse, ApiError } from '@/types/api';
 
 // Configure your API endpoint here
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const GRAPH_ENDPOINT = '/api/graph';
 
 /**
- * Fetch graph data from the backend
+ * Fetch graph data from the backend (Version 1)
+ * Expects plain Post[] array from /nodesJson/
+ */
+export async function fetchGraphDataV1(): Promise<DiagramNode[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/nodesJson/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // Add credentials if needed for authentication
+      // credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error: ApiError = {
+        message: `API request failed: ${response.statusText}`,
+        status: response.status,
+      };
+      throw error;
+    }
+
+    const data: DiagramNode[] = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching graph data V1:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch graph data from the backend (Version 2)
+ * Expects enriched format with diagram, metrics, and changes from /nodesJson/
+ */
+export async function fetchGraphDataV2(): Promise<GraphResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/nodesJson/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // Add credentials if needed for authentication
+      // credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error: ApiError = {
+        message: `API request failed: ${response.statusText}`,
+        status: response.status,
+      };
+      throw error;
+    }
+
+    const data: GraphResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching graph data V2:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch graph data from the backend (Legacy)
+ * @deprecated Use fetchGraphDataV1() or fetchGraphDataV2() instead
  */
 export async function fetchGraphData(): Promise<GraphResponse> {
   try {
@@ -89,35 +152,51 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 500));
 
-  // Return mock data matching sample_response.json
+  // Return mock data matching backend format with next_posts (plural) and phase
   return {
-    diagram: `graph TB
-    subgraph "Phase 1"
-        NODE1[<title>Instagram post</title><description>Create an Instagram carousel post (5 slides) highlighting our top features. Create an Instagram carousel post</description><variant1_title>Feature-focused</variant1_title><variant1_description>Feature-focused version...</variant1_description><variant2_title>Emotion-focused</variant2_title><variant2_description>Emotion-focused version ...</variant2_description>]
-        NODE2[<title>X post</title><description>Create an Instagram carousel post (5 slides) highlighting our top features.</description>]
-        NODE3[<title>Instagram Reels</title><description>Create an Instagram carousel post (5 slides) highlighting our top features.</description>]
-    end
-
-    subgraph "Phase 2"
-        NODE4[<title>Youtube Shorts</title><description>Create an Instagram carousel post (5 slides) highlighting our top features.</description>]
-        NODE5[<title>Video Marketing</title><description>Create an Instagram carousel post (5 slides) highlighting our top features.</description>]
-    end
-
-
-
-    NODE1 --> NODE2
-    NODE1 --> NODE3
-    NODE2 --> NODE4
-    NODE3 --> NODE5
-    NODE4 --> NODE5
-    NODE2 --> NODE3
-`,
+    diagram: [
+      {
+        pk: 1,
+        title: 'Instagram post',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features. Create an Instagram carousel post.',
+        next_posts: [2],
+        phase: 'Phase 1',
+      },
+      {
+        pk: 2,
+        title: 'X post',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        next_posts: [3],
+        phase: 'Phase 1',
+      },
+      {
+        pk: 3,
+        title: 'Instagram Reels',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        next_posts: [],
+        phase: 'Phase 2',
+      },
+      {
+        pk: 4,
+        title: 'Youtube Shorts',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        next_posts: [2, 5],
+        phase: 'Phase 2',
+      },
+      {
+        pk: 5,
+        title: 'Video Marketing',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        next_posts: [],
+        phase: 'Phase 3',
+      },
+    ],
     metrics: [
-      { node_id: 'NODE1', likes: 124, impressions: 1570, retweets: 45 },
-      { node_id: 'NODE2', likes: 98, impressions: 2034, retweets: 67 },
-      { node_id: 'NODE3', likes: 215, impressions: 3098, retweets: 120 },
-      { node_id: 'NODE4', likes: 56, impressions: 890, retweets: 10 },
-      { node_id: 'NODE5', likes: 180, impressions: 2500, retweets: 85 },
+      { pk: '1', likes: 124, impressions: 1570, retweets: 45 },
+      { pk: '2', likes: 98, impressions: 2034, retweets: 67 },
+      { pk: '3', likes: 215, impressions: 3098, retweets: 120 },
+      { pk: '4', likes: 56, impressions: 890, retweets: 10 },
+      { pk: '5', likes: 180, impressions: 2500, retweets: 85 },
     ],
     changes: false,
   };
