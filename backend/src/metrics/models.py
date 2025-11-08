@@ -4,6 +4,7 @@ from django.db import models
 class PostMetrics(models.Model):
     likes = models.IntegerField(default=0)
     retweets = models.IntegerField(default=0)
+    impressions = models.IntegerField(default=0)
     tweet_id = models.CharField(max_length=50)
 
     def __str__(self):
