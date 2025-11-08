@@ -6,6 +6,7 @@ Demonstrates the complete workflow of the Janus GTM OS.
 Make sure to set GOOGLE_API_KEY in your .env file before running.
 """
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -116,7 +117,7 @@ def demo_individual_agents():
     # Analyze a tweet
     analysis = metrics_agent.analyze_tweet("tweet_001")
     print(f"Analyzing tweet_001...")
-    print(f"Analysis output preview: {str(analysis)[:300]}...")
+    print(f"Analysis output preview: {json.dumps(analysis, indent=2)}")
 
 
 def demo_state_management():
@@ -186,8 +187,8 @@ def main():
 
     try:
         # Run demos
-        demo_orchestrator()
-        # demo_individual_agents()
+        # demo_orchestrator()
+        demo_individual_agents()
         # demo_state_management()
 
         print_section("✅ DEMO COMPLETE")
