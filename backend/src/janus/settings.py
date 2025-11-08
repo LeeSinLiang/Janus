@@ -149,7 +149,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 X_ACCESS_TOKEN = os.getenv('X_ACCESS_TOKEN')
+X_ACCESS_TOKEN_SECRET = os.getenv('X_ACCESS_TOKEN_SECRET')
+X_BEARER_TOKEN = os.getenv('X_BEARER_TOKEN')
 X_API_KEY = os.getenv('X_API_KEY')
+X_API_SECRET = os.getenv('X_API_SECRET')
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
 # Agent Settings
