@@ -3,12 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NodeMetrics Display ({{ node_id }})</title>
+    <title>Metrics Display</title>
 </head>
 <body>
-    <p>Node Id: {{ node_id }}</p>
-    <p>Likes: {{ likes }}</p>
-    <p>Impressions: {{ impressions }}</p>
-    <p>Retweets: {{ retweets }}</p>
+    <h1>Node Metrics:</h1>
+    <table>
+        <tr>
+            <th width="100px">Node ID</th>
+            <th width="100px">Likes</th>
+            <th width="100px">Impressions</th>
+            <th width="100px">Retweets</th>
+        </tr>
+        {% for node in nodes%}
+            <tr>
+                <td style="text-align: center;">{{ node.node_id }}</td>
+                <td style="text-align: center;">{{ node.likes }}</td>
+                <td style="text-align: center;">{{ node.impressions }}</td>
+                <td style="text-align: center;">{{ node.retweets }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+
+    <h1>Metrics JSON:</h1>
+    <pre>{{ metricsJson }}</pre>
+
 </body>
 </html>
