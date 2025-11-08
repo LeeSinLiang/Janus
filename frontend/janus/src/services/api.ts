@@ -184,6 +184,35 @@ export async function getXPostMetrics(nodePk: string): Promise<any> {
 }
 
 /**
+ * Generate a marketing strategy - sends POST request with product description and GTM goals
+ */
+export async function generateStrategy(params: {
+  product_description: string;
+  gtm_goals: string;
+  campaign_name: string;
+}): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/agents/strategy/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to generate strategy: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error generating strategy:', error);
+    throw error;
+  }
+}
+
+/**
  * Reject a node - sends POST request with node pk and rejection message
  */
 export async function rejectNode(nodePk: string, rejectMessage: string): Promise<void> {
