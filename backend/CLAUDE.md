@@ -23,8 +23,11 @@ cd src && python manage.py migrate
 
 ### Testing
 ```bash
-# Test complete system (from backend directory)
+# Test complete 3-scenario workflow (from backend directory)
 python demo.py
+# Scenario 1: Strategy Planning → Mermaid Diagram → Save to DB
+# Scenario 2: Generate A/B Content for all nodes
+# Scenario 3: Metrics Analysis → Improved Content
 
 # Test individual agents (from src directory)
 cd src
@@ -61,11 +64,12 @@ Two distinct implementation patterns:
 - Orchestrates tool calls based on natural language requests
 - Returns: `{"output": str, "raw_result": dict}` after extracting from messages
 
-**Chain Pattern** (content_creator.py, strategy_planner.py):
-- Uses LCEL: `prompt | model | JsonOutputParser`
-- Direct structured output generation
-- Returns: Dictionary matching Pydantic schema
-- **Critical**: JSON examples in prompts MUST escape braces with `{{` and `}}`
+**Structured Output Pattern** (content_creator.py, strategy_planner.py):
+- Uses `create_agent()` with `response_format=PydanticModel`
+- LangChain automatically selects strategy (ProviderStrategy for native support, ToolStrategy otherwise)
+- Direct structured output generation via Pydantic models
+- Returns: Pydantic object (e.g., `ContentOutput`, `StrategyOutput`)
+- **Note**: Temperature set to 0 for consistent structured output
 
 ### Layer 1: Low-Level Tools (tools.py)
 - Decorated with `@tool` from `langchain_core.tools`
@@ -108,30 +112,36 @@ last_message = result["messages"][-1]
 output = last_message.content if hasattr(last_message, 'content') else str(last_message)
 ```
 
-### Structured Output with JsonOutputParser
+### Structured Output with response_format
 
-For chain-based agents (content_creator, strategy_planner):
+For agents returning structured data (content_creator, strategy_planner):
 
 ```python
-from langchain_core.output_parsers import JsonOutputParser
+from langchain.agents import create_agent
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 class OutputSchema(BaseModel):
     field: str = Field(description="...")
 
-parser = JsonOutputParser(pydantic_object=OutputSchema)
-chain = prompt | model | parser
-result = chain.invoke({"request": user_input})  # Returns dict
+model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+
+agent = create_agent(
+    model,
+    tools=[],
+    system_prompt="Your prompt here",
+    response_format=OutputSchema  # Pass Pydantic model directly
+)
+
+# Invoke agent
+result = agent.invoke({"messages": [{"role": "user", "content": input_text}]})
+
+# Extract structured output from last message
+last_message = result["messages"][-1]
+output = last_message  # Returns Pydantic object directly
 ```
 
-**CRITICAL**: When including JSON examples in ChatPromptTemplate prompts, escape all braces:
-```python
-# WRONG - will cause "missing variables" error
-"""Return JSON: {"field": "value"}"""
-
-# CORRECT
-"""Return JSON: {{"field": "value"}}"""
-```
+**Note**: Use temperature=0 for consistent structured output generation.
 
 ### State Management Pattern
 
@@ -189,15 +199,28 @@ Wraps sub-agents as tools for the orchestrator:
 @tool
 def create_marketing_strategy(request: str) -> str:
     """Tool docstring becomes function description for LLM."""
-    result = self.strategy_planner.create_strategy(...)
-    return json.dumps(result)  # Return JSON string from tool
+    result = self.strategy_planner.execute(...)
+    return json.dumps(result.model_dump())  # Convert Pydantic to JSON
 ```
 
 ### Content Creator + Strategy Planner
-- Use `JsonOutputParser(pydantic_object=Schema)` for structured output
-- Pydantic schemas define expected output format with Field descriptions
-- Chain invocation: `chain.invoke({"request": text})`
-- Parser automatically validates and returns typed dict
+- Use `create_agent()` with `response_format=PydanticModel`
+- Pydantic schemas define expected output (e.g., `ContentOutput`, `StrategyOutput`)
+- Agent invocation: `agent.invoke({"messages": [{"role": "user", "content": text}]})`
+- Returns: Pydantic object with validated fields
+- Public API: `execute()` method extracts and returns Pydantic object directly
+
+**Example**:
+```python
+# Content Creator
+output = content_agent.execute(title, description, product_info)
+print(output.A)  # Access variant A
+print(output.B)  # Access variant B
+
+# Strategy Planner
+output = strategy_agent.execute(product_description, gtm_goals)
+print(output.diagram)  # Access Mermaid diagram
+```
 
 ### X Platform + Metrics Analyzer
 - Use `create_agent()` with tool arrays
@@ -211,16 +234,20 @@ def create_marketing_strategy(request: str) -> str:
 src/agents/
 ├── __init__.py           # Agent exports, factory functions
 ├── supervisor.py         # Layer 3: Orchestrator
-├── strategy_planner.py   # Layer 2: Strategy + Mermaid generation (chain)
-├── content_creator.py    # Layer 2: A/B content generation (chain)
-├── x_platform.py         # Layer 2: X/Twitter operations (agent)
-├── metrics_analyzer.py   # Layer 2: Metrics analysis (agent)
+├── strategy_planner.py   # Layer 2: Strategy + Mermaid generation (structured output)
+├── content_creator.py    # Layer 2: A/B content generation (structured output)
+├── x_platform.py         # Layer 2: X/Twitter operations (agent with tools)
+├── metrics_analyzer.py   # Layer 2: Metrics analysis (agent with tools)
 ├── tools.py              # Layer 1: Low-level @tool functions
 ├── state.py              # Database-backed state management (Django ORM)
 ├── models.py             # Django models: Campaign, Post, ContentVariant, etc.
+├── mermaid_parser.py     # Parse Mermaid diagrams into nodes/connections
 ├── admin.py              # Django admin for managing campaigns and data
 └── data/
     └── placeholder_metrics.json  # Mock X API data for testing
+
+Root directory:
+├── demo.py               # 3-scenario demo workflow (strategy → content → metrics)
 
 src/janus/
 └── settings.py           # Django config, AGENT_SETTINGS for temperatures
@@ -230,9 +257,10 @@ src/janus/
 
 1. **Import Errors**: Do NOT use `init_chat_model()` or `AgentExecutor` - these are old patterns
 2. **Model Names**: Use `"gemini-2.5-flash"` NOT `"google_genai:gemini-2.5-flash"`
-3. **Prompt Templates**: Always escape JSON braces as `{{` and `}}` in system prompts
-4. **Agent Invocation**: Use `agent.invoke({"messages": [...]})` NOT `executor.invoke({"input": ...})`
-5. **Type Handling**: When extracting `response.content`, cast to `str()` to avoid list type issues
+3. **Agent Invocation**: Use `agent.invoke({"messages": [...]})` NOT `executor.invoke({"input": ...})`
+4. **Type Handling**: When extracting `response.content`, cast to `str()` to avoid list type issues
+5. **Structured Output**: Use `response_format=PydanticModel` in `create_agent()`, NOT `JsonOutputParser` chain pattern
+6. **Temperature for Structured Output**: Always use temperature=0 for agents returning structured data (content_creator, strategy_planner)
 
 ## Django Integration
 
@@ -247,8 +275,19 @@ src/janus/
 **Database Schema:**
 - Campaigns track phases, store Mermaid diagrams, and link to posts
 - Posts have A/B variants (ContentVariant) and metrics stored as JSON
+- Posts support many-to-many relationships (next_posts) for campaign flow
 - Agent memories persist context and history between sessions
 - Conversation messages optionally link to campaigns for context
+
+**Mermaid Diagram Workflow:**
+1. Strategy Planner generates Mermaid diagram with custom node format:
+   - Nodes: `NODEX[<title>Title</title><description>Description</description>]`
+   - Exactly 3 subgraphs: "Phase 1", "Phase 2", "Phase 3"
+   - Connections: `NODE1 --> NODE2`
+2. Mermaid parser extracts nodes and connections from diagram string
+3. Create Campaign with strategy field containing Mermaid diagram
+4. Create Post objects for each node, link via next_posts M2M relationship
+5. Frontend renders Mermaid diagram for visual campaign planning
 
 ## Future Extensions (Post-Hackathon)
 

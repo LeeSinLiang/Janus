@@ -19,7 +19,9 @@ from agents.metrics_analyzer import MetricsAnalysis, SingleMetricsAnalysis
 class ContentOutput(BaseModel):
     """Schema for A/B content variants"""
     A: str = Field(description="Variant A - Professional/direct approach")
+    A_image_caption: str = Field(description="Caption for image representing Variant A")
     B: str = Field(description="Variant B - Casual/engaging with emojis")
+    B_image_caption: str = Field(description="Caption for image representing Variant B")
 
 
 # =====================
@@ -77,15 +79,14 @@ RULES:
    - Emojis increase engagement by 45%
    - Questions and threads get more replies
    - Clear value propositions get more clicks
-
-OUTPUT FORMAT:
-Return structured output with fields "A" and "B" containing plain text tweet content.
+8. Create image captions for each variant to guide visual design for another team to generate image for each variant. One image caption for one variant.
 
 IMPORTANT:
 - Each variant must be under 280 characters
 - NO markdown formatting in the content
 - NO asterisks, NO bold, NO italics, NO code blocks
-- Just plain text tweets ready to post"""
+- Just plain text tweets ready to post
+- Specific Detailed image captions for each variant"""
 
     def execute(self, title: str, description: str, product_info: str) -> ContentOutput:
         """
@@ -223,7 +224,9 @@ Use the analyzed report to understand what worked and what didn't, then create b
         # Fallback if no structured output found
         return ContentOutput(
             A="Error: No output generated for variant A",
-            B="Error: No output generated for variant B"
+			A_image_caption="Error: No output generated for variant A image caption",
+            B="Error: No output generated for variant B",
+			B_image_caption="Error: No output generated for variant B image caption"
         )
 
 
@@ -277,11 +280,10 @@ if __name__ == "__main__":
         description="New feature release with AI capabilities",
         product_info="Janus - AI GTM OS",
         old_content="Variant A: Just shipped a major update to Janus. Check it out.\nVariant B: 🚀 New Janus update is live! You're gonna love this 💪",
-        analyzed_report="""Analysis Summary:
-- Variant B performed 3x better (45% engagement rate vs 15% for variant A)
-- Emojis and enthusiasm drove significantly higher engagement
-- Key weakness: Neither variant clearly stated what the update includes
-- Recommendation: Keep casual tone and emojis, but add specific value proposition"""
+        analyzed_report=[
+			SingleMetricsAnalysis(metric_name="Engagement Rate", insight="Variant B had 30% higher engagement due to emojis and excitement tone."),
+			SingleMetricsAnalysis(metric_name="Click-Through Rate", insight="Variant A had clearer value proposition leading to 20% more clicks."),
+		]
     )
 
     print("\n--- Improved Variant A (Professional/Direct) ---")
