@@ -49,7 +49,7 @@ def create_tweet(request):
     )
 
 
-@api_view(['GET'])
+@api_view(['POST'])
 def get_tweets(request):
     """
     GET /clone/2/tweets
@@ -61,8 +61,8 @@ def get_tweets(request):
 
     Returns: {"data": [{...tweet objects...}]}
     """
-    # Get tweet IDs from query params
-    tweet_ids = request.GET.get('ids', '')
+    # Get tweet IDs
+    tweet_ids = request.data.get("tweet_ids")
     if not tweet_ids:
         return Response(
             {"errors": [{"message": "Missing required parameter: ids"}]},
@@ -92,7 +92,6 @@ def get_tweets(request):
         {"data": serializer.data},
         status=status.HTTP_200_OK
     )
-
 
 @api_view(['POST'])
 def like_tweet(request):
