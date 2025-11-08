@@ -74,7 +74,7 @@ class PostAdmin(admin.ModelAdmin):
 @admin.register(ContentVariant)
 class ContentVariantAdmin(admin.ModelAdmin):
     """Admin interface for ContentVariant model"""
-    list_display = ('variant_id', 'post', 'platform', 'content_preview', 'created_at')
+    list_display = ('variant_id', 'post', 'asset', 'content_preview', 'created_at')
     list_filter = ('platform', 'created_at')
     search_fields = ('variant_id', 'content', 'post__post_id')
     readonly_fields = ('created_at',)
@@ -84,7 +84,7 @@ class ContentVariantAdmin(admin.ModelAdmin):
             'fields': ('variant_id', 'post', 'platform')
         }),
         ('Content', {
-            'fields': ('content',)
+            'fields': ('content', 'asset')
         }),
         ('Metadata', {
             'fields': ('metadata',),

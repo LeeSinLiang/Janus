@@ -1,6 +1,9 @@
 # Django
 Django>=5.2.8
 
+# Flask (for web demo)
+Flask>=3.0.0
+
 # LangChain Core (verified from docs.langchain.com)
 langchain>=0.3.0
 langchain-core>=0.3.0

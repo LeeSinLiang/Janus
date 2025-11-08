@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Janus GTM OS - Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .input-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .input-section h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.2em;
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .campaign-info {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .campaign-info h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .campaign-info p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .post-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .post-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.5em;
+        }
+
+        .post-meta {
+            color: #888;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        .post-description {
+            color: #555;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .variants {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .variant {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            background: #fafafa;
+        }
+
+        .variant h4 {
+            color: #764ba2;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .variant-image {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        video.variant-image {
+            background: #000;
+            max-height: 500px;
+            object-fit: contain;
+        }
+
+        .image-caption {
+            font-size: 0.85em;
+            color: #666;
+            font-style: italic;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+        }
+
+        .variant-content {
+            color: #333;
+            line-height: 1.6;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        @media (max-width: 768px) {
+            .variants {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Janus GTM OS</h1>
+            <p>AI-Powered Marketing Strategy & Content Generation Demo</p>
+        </header>
+
+        <div class="input-section">
+            <h2>Configure Your Campaign</h2>
+            <div class="form-group">
+                <label for="product">Product Description:</label>
+                <textarea id="product" rows="4" placeholder="Describe your product...">Janus is an AI-powered GTM Operating System designed for technical founders. It automates marketing strategy planning, content creation with A/B testing, and metrics-driven optimization across social platforms like X and ProductHunt.</textarea>
+            </div>
+            <div class="form-group">
+                <label for="goals">GTM Goals:</label>
+                <textarea id="goals" rows="2" placeholder="What are your goals...">Launch product and acquire first 100 users in 4 weeks using X and ProductHunt</textarea>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="enableVideo" style="margin-right: 10px; width: auto; cursor: pointer;">
+                    <span>Enable Video Generation (Variant B only) 🎬</span>
+                </label>
+                <p style="font-size: 0.85em; color: #777; margin-top: 5px; margin-left: 30px;">
+                    When enabled, Variant B will generate videos instead of images. Videos take longer to generate (~2-3 min per video).
+                </p>
+            </div>
+            <button id="runBtn" onclick="runDemo()">Generate Campaign</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>🤖 Generating your marketing strategy and content...</p>
+            <p style="font-size: 0.9em; margin-top: 10px;">This may take 2-3 minutes...</p>
+        </div>
+
+        <div class="results" id="results">
+            <div class="campaign-info" id="campaignInfo"></div>
+            <div id="postsContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        async function runDemo() {
+            const product = document.getElementById('product').value;
+            const goals = document.getElementById('goals').value;
+            const enableVideo = document.getElementById('enableVideo').checked;
+            const runBtn = document.getElementById('runBtn');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+
+            // Show loading
+            runBtn.disabled = true;
+            loading.classList.add('active');
+            results.classList.remove('active');
+
+            try {
+                const response = await fetch('/run', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        product_description: product,
+                        gtm_goals: goals,
+                        enable_video: enableVideo
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    displayResults(data.results);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error running demo: ' + error.message);
+            } finally {
+                runBtn.disabled = false;
+                loading.classList.remove('active');
+            }
+        }
+
+        function displayResults(data) {
+            const results = document.getElementById('results');
+            const campaignInfo = document.getElementById('campaignInfo');
+            const postsContainer = document.getElementById('postsContainer');
+
+            // Display campaign info
+            campaignInfo.innerHTML = `
+                <h2>📋 Campaign: ${data.campaign.name}</h2>
+                <p><strong>Campaign ID:</strong> ${data.campaign.campaign_id}</p>
+                <p><strong>Description:</strong> ${data.campaign.description}</p>
+                <p><strong>Total Posts:</strong> ${data.campaign.total_posts}</p>
+            `;
+
+            // Display posts
+            postsContainer.innerHTML = '';
+            data.posts.forEach((post, index) => {
+                const postCard = document.createElement('div');
+                postCard.className = 'post-card';
+
+                const variantsHtml = post.variants.map(variant => {
+                    // Determine if it's image or video
+                    const isVideo = variant.media_type === 'video';
+                    const mediaHtml = isVideo
+                        ? `<video src="${variant.media_data}" class="variant-image" controls autoplay loop muted></video>`
+                        : `<img src="${variant.media_data}" alt="Variant ${variant.variant_id}" class="variant-image">`;
+
+                    const sizeInfo = variant.file_size_mb
+                        ? `<small style="color: #999;">(${variant.file_size_mb.toFixed(2)} MB)</small>`
+                        : '';
+
+                    return `
+                        <div class="variant">
+                            <h4>Variant ${variant.variant_id} ${isVideo ? '🎬' : '🖼️'}</h4>
+                            ${mediaHtml}
+                            <div class="image-caption">
+                                <strong>${isVideo ? 'Video' : 'Image'} prompt:</strong> ${variant.media_caption} ${sizeInfo}
+                            </div>
+                            <div class="variant-content">
+                                ${variant.content}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                postCard.innerHTML = `
+                    <h3>Post ${index + 1}: ${post.title}</h3>
+                    <div class="post-meta">
+                        ${post.phase} | ${post.post_id}
+                    </div>
+                    <div class="post-description">
+                        ${post.description}
+                    </div>
+                    <div class="variants">
+                        ${variantsHtml}
+                    </div>
+                `;
+
+                postsContainer.appendChild(postCard);
+            });
+
+            results.classList.add('active');
+            results.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

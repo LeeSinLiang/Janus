@@ -132,6 +132,7 @@ class ContentVariant(models.Model):
 
 	content = models.TextField()
 	platform = models.CharField(max_length=50, choices=PLATFORM_CHOICES, default='X')
+	asset = models.FileField(upload_to='content_variants/', blank=True, null=True)
 
 	# Store metadata (hook, reasoning, hashtags, etc.) as JSON
 	metadata = models.JSONField(default=dict, blank=True)

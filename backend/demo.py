@@ -10,11 +10,16 @@ Demonstrates the complete workflow of the Janus GTM OS:
 Make sure to set GOOGLE_API_KEY in your .env file before running.
 """
 
+import base64
+import io
 import json
 import os
 import sys
 from pathlib import Path
 from typing import Dict, List
+from django.core.files.base import ContentFile
+from PIL import Image
+
 
 # Add src to path for imports
 src_path = Path(__file__).parent / "src"
@@ -30,6 +35,7 @@ from agents.content_creator import create_content_creator
 from agents.metrics_analyzer import create_metrics_analyzer
 from agents.mermaid_parser import parse_mermaid_diagram
 from agents.models import Campaign, Post, ContentVariant
+from agents.media_creator import create_media_creator
 
 
 def print_section(title: str):
@@ -44,6 +50,60 @@ def print_subsection(title: str):
 	print("\n" + "-" * 80)
 	print(f"  {title}")
 	print("-" * 80 + "\n")
+
+
+def display_image_in_terminal(image_data: dict, variant_name: str):
+	"""Display image in terminal with metadata and visual preview.
+
+	Args:
+		image_data: Dict with 'mime_type' and 'data' (base64)
+		variant_name: Name of the variant (e.g., 'A', 'B')
+	"""
+	try:
+		# Decode base64 to image
+		image_bytes = base64.b64decode(image_data['data'])
+		image = Image.open(io.BytesIO(image_bytes))
+
+		# Display metadata
+		print(f"  📷 Variant {variant_name} Image:")
+		print(f"     Format: {image.format}, Size: {image.size[0]}x{image.size[1]}px, Mode: {image.mode}")
+
+		# Try to display image in terminal using different methods
+		try:
+			# Method 1: Try using term-image for inline display (if available)
+			from term_image.image import from_file
+			# Note: This would require the image to be saved temporarily
+			# For now, we'll just show the image using PIL's show method
+			pass
+		except ImportError:
+			pass
+
+		# Create ASCII art preview (simple version - show a grid of the image)
+		# Resize to small size for ASCII preview
+		preview_size = (60, 20)
+		preview = image.copy()
+		preview.thumbnail(preview_size, Image.Resampling.LANCZOS)
+
+		# Convert to grayscale for ASCII
+		preview_gray = preview.convert('L')
+
+		# ASCII characters from dark to light
+		ascii_chars = ' .:-=+*#%@'
+
+		print(f"     Preview (ASCII):")
+		for y in range(preview_gray.size[1]):
+			row = ""
+			for x in range(preview_gray.size[0]):
+				pixel = preview_gray.getpixel((x, y))
+				# Map pixel value (0-255) to ASCII character
+				char_index = int((pixel / 255) * (len(ascii_chars) - 1))
+				row += ascii_chars[char_index]
+			print(f"     {row}")
+
+		print()  # Empty line after preview
+
+	except Exception as e:
+		print(f"  ⚠️  Could not display image: {str(e)}")
 
 
 def load_placeholder_metrics() -> Dict:
@@ -158,7 +218,8 @@ def scenario_2_generate_ab_content(campaign: Campaign, product_info: str):
 	print_section("✍️  SCENARIO 2: GENERATE A/B CONTENT FOR ALL NODES")
 
 	content_agent = create_content_creator()
-	posts = campaign.posts.all().order_by('phase', 'post_id')
+	media_agent = create_media_creator(model_name='models/gemini-2.5-flash-image')
+	posts = campaign.posts.all().order_by('phase', 'post_id')[:3]
 
 	print(f"Generating A/B content for {posts.count()} posts...")
 
@@ -181,6 +242,18 @@ def scenario_2_generate_ab_content(campaign: Campaign, product_info: str):
 			platform='X',
 		)
 
+		# Create MediaAsset A
+		print(f"  🎨 Generating image for Variant A: {content_output.A_image_caption[:60]}...")
+		asset_a = media_agent.create_image(prompt=content_output.A_image_caption)
+		mime_type = asset_a['mime_type']
+		ext = mime_type.split('/')[-1]  # Extract extension from mime_type (e.g., 'image/png' -> 'png')
+		data = ContentFile(base64.b64decode(asset_a['data']))
+		variant_a.asset.save(f'variant_a_image.{ext}', data, save=True)
+		variant_a.save()
+
+		# Display image in terminal
+		display_image_in_terminal(asset_a, 'A')
+
 		# Create ContentVariant B
 		variant_b = ContentVariant.objects.create(
 			post=post,
@@ -189,7 +262,19 @@ def scenario_2_generate_ab_content(campaign: Campaign, product_info: str):
 			platform='X',
 		)
 
-		print(f"  ✅ Variant A ({len(content_output.A)} chars): {content_output.A[:60]}...")
+		# Create MediaAsset B
+		print(f"  🎨 Generating image for Variant B: {content_output.B_image_caption[:60]}...")
+		asset_b = media_agent.create_image(prompt=content_output.B_image_caption)
+		mime_type = asset_b['mime_type']
+		ext = mime_type.split('/')[-1]  # Extract extension from mime_type (e.g., 'image/png' -> 'png')
+		data = ContentFile(base64.b64decode(asset_b['data']))
+		variant_b.asset.save(f'variant_b_image.{ext}', data, save=True)
+		variant_b.save()
+
+		# Display image in terminal
+		display_image_in_terminal(asset_b, 'B')
+
+		print(f"\n  ✅ Variant A ({len(content_output.A)} chars): {content_output.A[:60]}...")
 		print(f"  ✅ Variant B ({len(content_output.B)} chars): {content_output.B[:60]}...")
 
 	print(f"\n✅ Scenario 2 Complete!")
@@ -363,12 +448,13 @@ def run_sequential_demo():
 		input("\n⏸️  Press Enter to continue to Scenario 2...")
 
 		# Scenario 2: Generate A/B Content
+		campaign = Campaign.objects.first()
 		scenario_2_generate_ab_content(campaign, product_description)
 
 		input("\n⏸️  Press Enter to continue to Scenario 3...")
 
 		# Scenario 3: Metrics Analysis & Improvement
-		scenario_3_metrics_analysis_and_improvement(campaign, product_description)
+		# scenario_3_metrics_analysis_and_improvement(campaign, product_description)
 
 		print_section("✅ SEQUENTIAL DEMO COMPLETE")
 		print("All 3 scenarios executed successfully!")
