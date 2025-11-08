@@ -6,7 +6,7 @@ from django.conf import settings
 from .models import PostMetrics
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .serializer import PostMetricsSerializer, PostSerializer
+from .serializer import PostMetricsSerializer, PostSerializer, ContentVariantSerializer
 from agents.models import Post, ContentVariant, Campaign
 from requests_oauthlib import OAuth1
 
@@ -97,6 +97,21 @@ def metricsJSON(request):
     qs = PostMetrics.objects.all()
     serializer = PostMetricsSerializer(qs, many=True)
     return Response(serializer.data)
+
+@api_view(['GET'])
+def getVariants(request):
+    """Get content variants for a post by pk"""
+    pk = request.GET.get("pk")
+    if not pk:
+        return Response({"error": "Missing 'pk' parameter"}, status=400)
+
+    try:
+        post = Post.objects.get(pk=pk)
+        variants = post.variants.all()  # Uses related_name='variants' from ContentVariant model
+        serializer = ContentVariantSerializer(variants, many=True)
+        return Response({"variants": serializer.data}, status=200)
+    except Post.DoesNotExist:
+        return Response({"error": f"Post with pk={pk} not found"}, status=404)
 
 @api_view(['POST'])
 def approveNode(request):
