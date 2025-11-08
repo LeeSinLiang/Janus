@@ -35,9 +35,24 @@ def nodesJSON(request):
 	serializer = PostSerializer(posts, many=True)
 	metricsData = getMetricsDB()
 
+	# Get first 4 published posts with metrics for the chart view
+	published_posts = Post.objects.filter(status="published").select_related('metrics').order_by('created_at')[:4]
+	post_metrics = []
+	for post in published_posts:
+		m = getattr(post, "metrics", None)
+		post_metrics.append({
+			"pk": post.pk,
+			"title": post.title,
+			"description": post.description,
+			"likes": m.likes if m else 0,
+			"retweets": m.retweets if m else 0,
+			"impressions": m.impressions if m else 0,
+		})
+
 	return Response({
 		"diagram": serializer.data,
-		"metrics": metricsData
+		"metrics": metricsData,
+		"post_metrics": post_metrics
 	}, status=200)
 
 @api_view(['POST'])

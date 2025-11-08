@@ -24,6 +24,7 @@ import NodeVariantModal from './NodeVariantModal';
 import WelcomeBar from './WelcomeBar';
 import EngagementLineChart from './EngagementLineChart';
 import EngagementPieChart from './EngagementPieChart';
+import PostMetricsBox from './PostMetricsBox';
 import { useGraphData } from '@/hooks/useGraphData';
 import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost } from '@/services/api';
 import { Node as FlowNode } from '@xyflow/react';
@@ -67,7 +68,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
 
   // Fetch graph data with automatic polling and diff-based updates
   // The hook now handles all diffing internally and preserves positions
-  const { nodes, edges, loading, error, setNodes, setEdges } = useGraphData({
+  const { nodes, edges, postMetrics, loading, error, setNodes, setEdges } = useGraphData({
     pollingInterval: 5000,
     useMockData: false, // Set to false when connecting to real backend
   });
@@ -374,6 +375,15 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
               {/* Pie Chart */}
               <EngagementPieChart />
             </div>
+
+            {/* Post Metrics Boxes - 4 columns single row */}
+            {postMetrics.length > 0 && (
+              <div className="grid grid-cols-4 gap-4">
+                {postMetrics.map((post) => (
+                  <PostMetricsBox key={post.pk} post={post} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

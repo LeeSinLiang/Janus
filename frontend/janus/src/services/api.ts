@@ -40,6 +40,7 @@ export async function fetchGraphDataV1(): Promise<GraphResponse> {
     return {
       diagram: data.diagram || [],
       metrics: metricsWithNumberKeys,
+      post_metrics: data.post_metrics || [],
       changes: true, // Always process on fetch
     };
   } catch (error) {
@@ -337,6 +338,40 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
       4: { likes: 56, impressions: 890, retweets: 10 },
       5: { likes: 180, impressions: 2500, retweets: 85 },
     },
+    post_metrics: [
+      {
+        pk: 1,
+        title: 'X post 1',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        likes: 34700,
+        retweets: 8300,
+        impressions: 54600,
+      },
+      {
+        pk: 2,
+        title: 'X post 2',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        likes: 34700,
+        retweets: 8300,
+        impressions: 34600,
+      },
+      {
+        pk: 3,
+        title: 'X post 3',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        likes: 34700,
+        retweets: 8300,
+        impressions: 34600,
+      },
+      {
+        pk: 4,
+        title: 'X post 4',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        likes: 34700,
+        retweets: 8300,
+        impressions: 54600,
+      },
+    ],
     changes: false,
   };
 }
