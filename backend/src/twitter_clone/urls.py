@@ -3,8 +3,9 @@ from . import views
 
 urlpatterns = [
     # Twitter API v2 compatible endpoints (for API calls)
+    # path('2/tweets', views.tweets_endpoint, name='clone_tweets'),
     path('2/tweets', views.create_tweet, name='clone_create_tweet'),  # POST
-    path('2/tweets', views.get_tweets, name='clone_get_tweets'),  # GET (Django routes by method)
+    path('2/metrics/', views.get_tweets, name='clone_get_tweets'),  # GET (Django routes by method)
 
     # Additional API actions
     path('2/tweets/like', views.like_tweet, name='clone_like_tweet'),

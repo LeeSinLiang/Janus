@@ -12,27 +12,6 @@ from time import time
 from django.core.cache import cache
 
 
-CACHE_TTL = 120
-def should_skip_fetch(tweet_id):
-    key = f"x:last-fetch:{tweet_id}"
-    last = cache.get(key)
-    if last and time() - last < CACHE_TTL:
-        return True
-    cache.set(key, time(), CACHE_TTL)
-    return False
-
-auth = OAuth1(
-    settings.X_API_KEY,
-    settings.X_API_SECRET,
-    settings.X_ACCESS_TOKEN,
-    settings.X_ACCESS_TOKEN_SECRET,
-)
-
-POLL_TIMEOUT_SEC = 30
-POLL_INTERVAL_SEC = 1.0
-GRAPH_VERSION = "v23.0"
-
-
 # Create your views here.
 @api_view(['GET'])
 def nodesJSON(request):
@@ -83,26 +62,37 @@ def getXPostMetrics(request):
     tweet_id = postMetrics.tweet_id
 
     # Use clone API instead of real Twitter API
-    url = f"http://localhost:8000/clone/2/tweets"
+    url = f"http://localhost:8000/clone/2/metrics/"
     headers = {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
     }
-    params = {
-        "ids": tweet_id,
-        "tweet.fields": "public_metrics"
-    }
+    body = {"tweet_ids": tweet_id}
 
-    resp = requests.get(url, headers=headers, params=params)
+    resp = requests.post(url, headers=headers, json=body)
     data = resp.json()
 
-    if resp.status_code == 200:
-        d = data["data"][0]
-        pub = d.get("public_metrics", {})
-        postMetrics.likes = pub.get("like_count", 0)
-        postMetrics.retweets = pub.get("retweet_count", 0)
-        postMetrics.save()
-        return Response(data, status=200)
-    return Response({"error": data}, status=resp.status_code)
+    if resp.status_code != 200:
+        return Response({"error": resp.text}, status=resp.status_code)
+    
+    data = resp.json()
+    items = data.get("data") or []
+    if not items:
+        return Response({"error": "Tweet not found in clone API."}, status=404)
+
+    d = items[0]
+    pub = d.get("public_metrics", {})
+    nonpub = d.get("non_public_metrics", {})
+
+    retweetCount = pub.get("retweet_count")
+    likeCount = pub.get("like_count")
+    impressionCount = nonpub.get("impression_count")
+
+    postMetrics.retweets = retweetCount
+    postMetrics.likes = likeCount
+    postMetrics.impressions = impressionCount
+    postMetrics.save()
+
+    return Response(resp.json(), status=resp.status_code)
 
 @api_view(['GET'])
 def metricsJSON(request):
@@ -205,19 +195,4 @@ def rejectNode(request):
             "error": f"Post with pk={pk} not found"
         }, status=404)
 
-
-
-
-########################################################################
-#                               INSTAGRAM
-#########################################################################
-def createIGPost(request):
-    pk = request.data.get("pk")
-    if not pk:
-        return Response({"error": "Missing 'pk' field"}, status=400)
-    
-    post = Post.objects.get(pk=pk)
-    variantId = post.selected_variant
-    selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=post)
-    text = selectedVariant.content
 
