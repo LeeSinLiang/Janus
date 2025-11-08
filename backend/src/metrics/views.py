@@ -238,3 +238,53 @@ def rejectNode(request):
 		return Response({
 			"error": f"Post with pk={pk} not found"
 		}, status=404)
+	
+
+
+#CODE FOR ACTUAL X API (can't be used due to rate limits on free plan)
+# @api_view(['POST'])
+# def createXPost(request):
+# 	pk = request.data.get("pk")
+# 	if not pk:
+# 		return Response({"error": "Missing 'pk' field"}, status=400)
+
+# 	post = Post.objects.get(pk=pk)
+
+	
+# 	if post.selected_variant:
+# 		variant = ContentVariant.objects.filter(variant_id=post.selected_variant, post=post).first()
+# 		text = variant.content if variant else post.description
+# 	else:
+		
+# 		variant = ContentVariant.objects.filter(variant_id="A", post=post).first()
+# 		text = variant.content if variant else post.description
+
+# 	# Use clone API instead of real Twitter API
+# 	url = f"http://api.x.com/2/tweets"
+# 	headers = {
+# 		"Content-Type": "application/json"
+# 	}
+# 	body = {"text": text}
+
+# 	resp = requests.post(url, headers=headers, json=body)
+# 	data = resp.json()
+
+# 	if resp.status_code == 201:
+# 		tweet_id = (data.get("data")).get("id")
+# 		if tweet_id:
+# 			postMetrics = post.metrics
+# 			if postMetrics:
+# 				postMetrics.tweet_id = tweet_id
+# 				postMetrics.save()
+# 			post.status = "published"
+# 			post.save()
+
+# 	return Response(resp.json(), status=resp.status_code)
+
+# @api_view(['GET'])
+# def getXPostMetrics(request):
+    # url = "https://api.x.com/2/tweets"
+    # headers = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+    # params = {"ids": ",".join(tweet_ids[:100]), "tweet.fields": "public_metrics"}
+    # return requests.get(url, headers=headers, params=params)
+	
