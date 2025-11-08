@@ -15,6 +15,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import TaskCardNode from './TaskCardNode';
+import ChatBox from './ChatBox';
 
 const nodeTypes = {
   taskCard: TaskCardNode,
@@ -101,7 +102,7 @@ const initialNodes: Node[] = [
   },
 ];
 
-const initialEdges = [
+const initialEdges: Edge[] = [
   {
     id: 'e1-2',
     source: '1',
@@ -141,32 +142,20 @@ export default function Canvas() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const onConnect = useCallback(
-    (params: Edge | Connection) =>
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...params,
-            type: 'smoothstep',
-            style: { stroke: '#94A3B8', strokeWidth: 2 },
-          },
-          eds
-        )
-      ),
+    (params: Edge | Connection) => {
+      const newEdge = {
+        ...params,
+        type: 'smoothstep',
+        style: { stroke: '#94A3B8', strokeWidth: 2 },
+      };
+      setEdges((eds) => addEdge(newEdge as Edge, eds));
+    },
     [setEdges]
   );
 
   return (
     <div className="relative h-full w-full bg-gray-50">
-      {/* <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 transform rounded-lg border border-zinc-200 bg-white px-4 py-2 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-lg">✨</span>
-          <span className="font-medium text-zinc-900 dark:text-zinc-100">AI Applied</span>
-          <span className="text-zinc-500 dark:text-zinc-400">
-            Some parts of the flow are optimized or auto-generated using AI.
-          </span>
-        </div>
-      </div>
-    */}
+      {/* ReactFlow Canvas */}
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -180,6 +169,13 @@ export default function Canvas() {
         <Controls />
         <Background color="#e5e7eb" variant={BackgroundVariant.Dots} gap={16} size={4} />
       </ReactFlow>
+
+      {/* Floating ChatBox at the bottom */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
+        <div className="pointer-events-auto w-full max-w-[50%] rounded-xl border border-zinc-200 bg-white shadow-lg">
+          <ChatBox nodes={nodes} />
+        </div>
+      </div>
     </div>
   );
 }
