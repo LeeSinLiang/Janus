@@ -99,7 +99,6 @@ def metricsJSON(request):
     return Response(serializer.data)
 
 @api_view(['POST'])
-@csrf_exempt
 def approveNode(request):
     """Approve a pending node"""
     pk = request.data.get("pk")
@@ -122,7 +121,6 @@ def approveNode(request):
         }, status=404)
 
 @api_view(['POST'])
-@csrf_exempt
 def rejectNode(request):
     """Reject a pending node and remove it"""
     pk = request.data.get("pk")
