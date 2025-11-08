@@ -13,12 +13,17 @@ import {
   OnEdgesChange,
   applyNodeChanges,
   applyEdgeChanges,
+  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import TaskCardNode from './TaskCardNode';
 import ChatBox from './ChatBox';
 import ViewToggle from './ViewToggle';
+import PhaseBar from './PhaseBar';
 import NodeVariantModal from './NodeVariantModal';
+import WelcomeBar from './WelcomeBar';
+import EngagementLineChart from './EngagementLineChart';
+import EngagementPieChart from './EngagementPieChart';
 import { useGraphData } from '@/hooks/useGraphData';
 import { approveNode, rejectNode } from '@/services/api';
 import { Node as FlowNode } from '@xyflow/react';
@@ -41,6 +46,16 @@ export default function CanvasWithPolling() {
 
   // Modal state for viewing node variants
   const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
+
+  // Phase state
+  const [activePhase, setActivePhase] = useState(1); // 0-indexed, so 1 = Phase 2
+
+  // Phase data
+  const phases = [
+    { name: 'Phase 1', dateRange: '(11 / 01 - 11 / 07)', isActive: activePhase === 0 },
+    { name: 'Phase 2', dateRange: '(11 / 08 - 11 / 14)', isActive: activePhase === 1 },
+    { name: 'Phase 3', dateRange: '(11 / 15 - 11 / 21)', isActive: activePhase === 2 },
+  ];
 
   // Fetch graph data with automatic polling and diff-based updates
   // The hook now handles all diffing internally and preserves positions
@@ -201,8 +216,8 @@ export default function CanvasWithPolling() {
       const newEdge = {
         ...params,
         type: 'default',
-        markerEnd: 'arrow',
-         animated: true,
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#94A3B8' },
+        animated: true,
         style: { stroke: '#94A3B8', strokeWidth: 2 },
       };
       setEdges((eds) => addEdge(newEdge as Edge, eds));
@@ -264,6 +279,13 @@ export default function CanvasWithPolling() {
         <ViewToggle activeView={activeView} onViewChange={setActiveView} />
       </div>
 
+      {/* Phase Bar - positioned at top center (only in node-editor view) */}
+      {activeView === 'node-editor' && (
+        <div className="absolute left-1/2 top-8 z-10 -translate-x-1/2">
+          <PhaseBar phases={phases} onPhaseClick={setActivePhase} />
+        </div>
+      )}
+
       {/* Conditional view rendering */}
       {activeView === 'node-editor' ? (
         <>
@@ -295,26 +317,20 @@ export default function CanvasWithPolling() {
           </div>
         </>
       ) : (
-        /* Chart View Placeholder */
-        <div className="flex h-full w-full items-center justify-center">
-          <div className="text-center">
-            <svg
-              width="80"
-              height="80"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="mx-auto mb-4 text-gray-300"
-            >
-              <line x1="18" y1="20" x2="18" y2="10" />
-              <line x1="12" y1="20" x2="12" y2="4" />
-              <line x1="6" y1="20" x2="6" y2="14" />
-            </svg>
-            <h2 className="text-xl font-semibold text-gray-700">Chart View</h2>
-            <p className="mt-2 text-gray-500">Coming soon...</p>
+        /* Chart View */
+        <div className="h-full w-full overflow-y-auto bg-gray-50 px-8 pt-24 pb-8">
+          <div className="mx-auto max-w-7xl space-y-6">
+            {/* Welcome Bar */}
+            <WelcomeBar />
+
+            {/* Charts Grid */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {/* Line Chart */}
+              <EngagementLineChart />
+
+              {/* Pie Chart */}
+              <EngagementPieChart />
+            </div>
           </div>
         </div>
       )}

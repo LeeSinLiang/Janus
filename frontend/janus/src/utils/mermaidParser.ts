@@ -1,4 +1,4 @@
-import { Node, Edge } from '@xyflow/react';
+import { Node, Edge, MarkerType } from '@xyflow/react';
 import { NodeMetrics } from '@/types/api';
 
 interface Variant {
@@ -265,9 +265,8 @@ function convertEdgesToReactFlow(parsedEdges: ParsedEdge[]): Edge[] {
         id: `e${index}-forward`,
         source: edge.source,
         target: edge.target,
-        markerEnd: 'arrow',
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#94A3B8' },
         type: 'default',
-        
         style: { stroke: '#94A3B8', strokeWidth: 2 },
       });
 
@@ -276,9 +275,8 @@ function convertEdgesToReactFlow(parsedEdges: ParsedEdge[]): Edge[] {
         id: `e${index}-backward`,
         source: edge.target,
         target: edge.source,
-        markerEnd: 'arrow',
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#94A3B8' },
         type: 'default',
-        
         style: { stroke: '#94A3B8', strokeWidth: 2, strokeDasharray: '5,5' },
       });
     } else {
@@ -287,9 +285,8 @@ function convertEdgesToReactFlow(parsedEdges: ParsedEdge[]): Edge[] {
         id: `e${index}`,
         source: edge.source,
         target: edge.target,
-        markerEnd: 'arrow',
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#94A3B8' },
         type: 'default',
-        
         style: { stroke: '#94A3B8', strokeWidth: 2 },
       });
     }
