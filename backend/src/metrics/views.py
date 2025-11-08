@@ -7,7 +7,7 @@ from .models import PostMetrics
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .serializer import PostMetricsSerializer, PostSerializer
-from agents.models import Post, ContentVariant
+from agents.models import Post, ContentVariant, Campaign
 from requests_oauthlib import OAuth1
 
 auth = OAuth1(
