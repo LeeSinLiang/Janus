@@ -85,7 +85,6 @@ def getXPostMetrics(request):
     # Use clone API instead of real Twitter API
     url = f"http://localhost:8000/clone/2/tweets"
     headers = {
-        "Authorization": f"Bearer {settings.X_BEARER_TOKEN}",  # <- user-context token
         "Content-Type": "application/json",
     }
     params = {
