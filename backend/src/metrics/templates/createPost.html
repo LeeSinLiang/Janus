@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Post Test</title>
+</head>
+<body>
+    <button id="postButton">POST to X</button>
+
+    <script>
+        async function createXPost() {
+        const pk = 1;
+
+        const response = await fetch("/api/create-x-post/", {   // <-- change URL to match your Django route
+            method: "POST",
+            headers: {
+            "Content-Type": "application/json",
+            // If you're using Django templates + CSRF, uncomment the next line and define getCookie
+            // "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify({ text: text })
+        });
+
+        const data = await response.json();
+        console.log("Response from backend:", data);
+        alert(JSON.stringify(data));
+        }
+
+        document.getElementById("postButton").addEventListener("click", createXPost);
+    </script>
+</body>
+</html>

@@ -6,7 +6,8 @@ from django.conf import settings
 from .models import PostMetrics
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .serializer import PostMetricsSerializer
+from .serializer import PostMetricsSerializer, PostSerializer
+from agents.models import Post
 
 
 
@@ -16,6 +17,12 @@ def metricsJSON(request):
     qs = PostMetrics.objects.all()
     serializer = PostMetricsSerializer(qs, many=True)
     return Response(serializer.data) 
+
+@api_view(['GET'])
+def nodesJSON(request):
+    qs = Post.objects.all()
+    serializer = PostSerializer(qs, many=True)
+    return Response(serializer.data)
 
 @api_view(['POST'])
 def createXPost(request):
