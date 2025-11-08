@@ -35,6 +35,53 @@ export async function fetchGraphData(): Promise<GraphResponse> {
 }
 
 /**
+ * Approve a node - sends POST request with node name
+ */
+export async function approveNode(nodeName: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ node_name: nodeName }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to approve node: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error approving node:', error);
+    throw error;
+  }
+}
+
+/**
+ * Reject a node - sends POST request with node name and rejection message
+ */
+export async function rejectNode(nodeName: string, rejectMessage: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}${GRAPH_ENDPOINT}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        node_name: nodeName,
+        reject_message: rejectMessage
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to reject node: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error rejecting node:', error);
+    throw error;
+  }
+}
+
+/**
  * Mock function for development/testing
  * Remove this when connecting to real backend
  */
@@ -62,8 +109,8 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
     NODE1 --> NODE3
     NODE2 --> NODE4
     NODE3 --> NODE5
-    NODE4 <--> NODE5
-    NODE2 <--> NODE3
+    NODE4 --> NODE5
+    NODE2 --> NODE3
 `,
     metrics: [
       { node_id: 'NODE1', likes: 124, impressions: 1570, retweets: 45 },
