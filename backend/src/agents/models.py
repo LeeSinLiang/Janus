@@ -61,18 +61,34 @@ class Post(models.Model):
 		('analyzed', 'Analyzed'),
 	]
 
-	post_id = models.CharField(max_length=255) 
+	PHASE_CHOICES = [
+		('Phase 1', 'Phase 1'),
+		('Phase 2', 'Phase 2'),
+		('Phase 3', 'Phase 3'),
+	]
+
+	post_id = models.CharField(max_length=255)
 	campaign = models.ForeignKey(
 		Campaign,
 		on_delete=models.CASCADE,
 		related_name='posts'
 	)
 
-	phase = models.CharField(max_length=100)
+	title = models.CharField(max_length=500, default='')
+	description = models.TextField(default='')
+	phase = models.CharField(max_length=10, choices=PHASE_CHOICES, default='Phase 1')
 	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
 	selected_variant = models.CharField(max_length=10, blank=True, null=True)
 
 	metrics = models.ForeignKey(PostMetrics, on_delete=models.SET_NULL, null=True, blank=True)
+
+	# Many-to-many relationship to track post dependencies
+	next_posts = models.ManyToManyField(
+		'self',
+		blank=True,
+		symmetrical=False,
+		related_name='previous_posts'
+	)
 
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
