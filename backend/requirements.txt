@@ -1,0 +1,26 @@
+# Django
+Django>=5.2.8
+
+# LangChain Core (verified from docs.langchain.com)
+langchain>=0.3.0
+langchain-core>=0.3.0
+
+# LangChain Google Genai
+langchain-google-genai>=2.0.0
+
+# LangGraph (for agents)
+langgraph>=0.2.0
+
+# Google Generative AI
+google-generativeai>=0.8.0
+
+# Data Validation & Serialization
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+httpx>=0.27.0
+
+# Django REST Framework (for future API endpoints)
+djangorestframework>=3.14.0

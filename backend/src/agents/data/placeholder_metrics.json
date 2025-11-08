@@ -1,0 +1,154 @@
+{
+  "tweets": [
+    {
+      "tweet_id": "tweet_001",
+      "content": "Excited to announce our new product launch! 🚀",
+      "posted_at": "2025-11-06T14:00:00Z",
+      "metrics": {
+        "views": 12500,
+        "likes": 342,
+        "retweets": 87,
+        "replies": 23,
+        "quotes": 15,
+        "engagement_rate": 3.74,
+        "click_through_rate": 2.1
+      },
+      "audience_insights": {
+        "peak_engagement_time": "14:30",
+        "top_demographics": ["tech_founders", "developers", "product_managers"],
+        "sentiment": "positive"
+      },
+      "comments": [
+        {
+          "comment_id": "c001",
+          "text": "This looks amazing! When can we try it?",
+          "sentiment": "positive",
+          "mentions_topic": ["interest", "trial"]
+        },
+        {
+          "comment_id": "c002",
+          "text": "What's the pricing like?",
+          "sentiment": "neutral",
+          "mentions_topic": ["pricing"]
+        }
+      ]
+    },
+    {
+      "tweet_id": "tweet_002",
+      "content": "Here's how we solved the marketing automation problem for technical founders 🧵",
+      "posted_at": "2025-11-06T18:00:00Z",
+      "metrics": {
+        "views": 8900,
+        "likes": 256,
+        "retweets": 45,
+        "replies": 31,
+        "quotes": 8,
+        "engagement_rate": 3.82,
+        "click_through_rate": 1.8
+      },
+      "audience_insights": {
+        "peak_engagement_time": "18:45",
+        "top_demographics": ["tech_founders", "marketers", "startup_owners"],
+        "sentiment": "positive"
+      },
+      "comments": [
+        {
+          "comment_id": "c003",
+          "text": "This is exactly what I needed!",
+          "sentiment": "positive",
+          "mentions_topic": ["problem_fit"]
+        },
+        {
+          "comment_id": "c004",
+          "text": "How does it compare to Buffer?",
+          "sentiment": "neutral",
+          "mentions_topic": ["comparison", "competitors"]
+        }
+      ]
+    },
+    {
+      "tweet_id": "tweet_003",
+      "content": "Marketing shouldn't be a pain for technical founders. We're changing that.",
+      "posted_at": "2025-11-05T10:00:00Z",
+      "metrics": {
+        "views": 6200,
+        "likes": 178,
+        "retweets": 32,
+        "replies": 12,
+        "quotes": 5,
+        "engagement_rate": 3.66,
+        "click_through_rate": 1.5
+      },
+      "audience_insights": {
+        "peak_engagement_time": "11:00",
+        "top_demographics": ["tech_founders", "engineers"],
+        "sentiment": "neutral"
+      },
+      "comments": [
+        {
+          "comment_id": "c005",
+          "text": "Tell me more about the features",
+          "sentiment": "positive",
+          "mentions_topic": ["features"]
+        }
+      ]
+    }
+  ],
+  "platform_insights": {
+    "best_posting_times": [
+      {"hour": 10, "day": "weekday", "avg_engagement": 3.2},
+      {"hour": 14, "day": "weekday", "avg_engagement": 3.8},
+      {"hour": 18, "day": "weekday", "avg_engagement": 3.9},
+      {"hour": 20, "day": "weekend", "avg_engagement": 2.9}
+    ],
+    "audience_active_hours": {
+      "weekday": ["09:00-11:00", "14:00-16:00", "18:00-20:00"],
+      "weekend": ["10:00-12:00", "19:00-21:00"]
+    },
+    "trending_topics": [
+      {"topic": "AI automation", "score": 0.85},
+      {"topic": "startup growth", "score": 0.78},
+      {"topic": "marketing tools", "score": 0.72},
+      {"topic": "technical founders", "score": 0.68}
+    ],
+    "competitor_benchmarks": {
+      "avg_engagement_rate": 2.5,
+      "avg_follower_growth": 0.3,
+      "avg_response_time": "2 hours"
+    }
+  },
+  "content_performance": {
+    "top_performing_formats": [
+      {"format": "thread", "avg_engagement": 4.2},
+      {"format": "announcement", "avg_engagement": 3.7},
+      {"format": "question", "avg_engagement": 3.1},
+      {"format": "tip", "avg_engagement": 2.9}
+    ],
+    "optimal_content_length": {
+      "short": {"char_range": "50-100", "avg_engagement": 2.8},
+      "medium": {"char_range": "100-200", "avg_engagement": 3.5},
+      "long": {"char_range": "200-280", "avg_engagement": 3.2}
+    },
+    "emoji_impact": {
+      "with_emoji": 3.6,
+      "without_emoji": 2.4
+    }
+  },
+  "ab_test_results": {
+    "tests": [
+      {
+        "test_id": "test_001",
+        "variant_a": {
+          "content": "Launching our AI-powered GTM OS for founders",
+          "engagement_rate": 3.2
+        },
+        "variant_b": {
+          "content": "Technical founders: automate your marketing with AI 🚀",
+          "engagement_rate": 4.1
+        },
+        "winner": "variant_b",
+        "confidence": 0.89
+      }
+    ]
+  }
+}

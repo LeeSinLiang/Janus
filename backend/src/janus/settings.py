@@ -37,6 +37,11 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Third-party apps
+    "rest_framework",
+    # Local apps
+    "core",
+    "agents",
 ]
 
 MIDDLEWARE = [
@@ -120,3 +125,36 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Django REST Framework
+# https://www.django-rest-framework.org/api-guide/settings/
+
+REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+    ],
+}
+
+# Agent Configuration
+# Google API Key for Gemini (loaded from environment variable)
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+
+# Agent Settings
+AGENT_SETTINGS = {
+    "DEFAULT_MODEL": os.getenv("GEMINI_MODEL_CODE"),
+    "CONTENT_CREATOR_TEMPERATURE": 0.7,
+    "X_PLATFORM_TEMPERATURE": 0.3,
+    "METRICS_ANALYZER_TEMPERATURE": 0.4,
+    "STRATEGY_PLANNER_TEMPERATURE": 0.6,
+    "ORCHESTRATOR_TEMPERATURE": 0.5,
+}
