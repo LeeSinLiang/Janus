@@ -1,0 +1,48 @@
+
+    ╔═══════════════════════════════════════════════════════════════════╗
+    ║                                                                   ║
+    ║         🚀 JANUS - AI-Powered GTM OS                             ║
+    ║         Multi-Agent System Demo                                   ║
+    ║                                                                   ║
+    ╚═══════════════════════════════════════════════════════════════════╝
+    
+✅ Google API Key found!
+
+This demo will showcase:
+  1. Orchestrator coordinating all agents
+  2. Individual agents working independently
+  3. State management system
+
+======================================================================
+  🎯 ORCHESTRATOR DEMO - Complete Workflow
+======================================================================
+
+📋 1. Creating Campaign Strategy...
+✅ Strategy created!
+Output preview: ["Here's a marketing strategy for Janus, an AI-powered GTM OS for technical founders, aimed at launching and acquiring the first 100 users in 4 weeks using X and ProductHunt:\n\n**Campaign Goal:** Launch Janus and acquire the first 100 active users within 4 weeks.\n\n**Target Audience:** Technical founders, Developers, Startup owners (who value data-driven solutions, technical depth, authenticity, ROI, and efficiency).\n\n**Key Metrics:**\n*   Total new user sign-ups\n*   ProductHunt upvotes & ranking (top 5)\n*   X impressions & engagement rate\n*   Waitlist sign-ups (pre-launch)\n*   User activation rate (e.g., % of users completing a key first action)\n*   Qualitative feedback collected (survey responses, interview participation)\n\n**Campaign Phases:**\n\n**Phase 1: Awareness & Validation (Pre-Launch) - Week 1**\n*   **Objectives:** Generate initial buzz and awareness, validate core messaging, grow an early interest list, identify potential early adopters.\n*   **Channels:** X, ProductHunt (teaser/upcoming page setup), relevant Developer/Startup Communities.\n*   **Content Themes:** Problem-centric posts, sneak peeks, #BuildInPublic updates, CTAs for waitlist/early access, engaging with relevant hashtags.\n\n**Phase 2: Launch & Acquisition - Week 2**\n*   **Objectives:** Successfully launch on ProductHunt and X, drive new user sign-ups, secure a top 5 ProductHunt ranking, generate initial reviews.\n*   **Channels:** ProductHunt, X, Email list (from Phase 1).\n*   **Content Themes:** ProductHunt page (value prop, video/GIFs, strong CTA, active comment engagement), X launch announcement thread, email announcement to waitlist.\n\n**Phase 3: Early Growth & Feedback - Weeks 3-4**\n*   **Objectives:** Achieve the 100-user goal, effectively onboard new users, gather qualitative/quantitative feedback, identify features for improvement, continue organic acquisition.\n*   **Channels:** X, Email (onboarding, feedback requests), In-app messaging/surveys, direct outreach.\n*   **Content Themes:** X (user stories, tips, updates), Email (welcome, guides, surveys), In-app (micro-surveys, feature walkthroughs).\n\n**Success Criteria:** The campaign will be deemed successful if Janus acquires 100 active users within 4 weeks, achieves a top 5 ranking on ProductHunt launch day, and gathers substantial qualitative feedback to inform the immediate product roadmap.\n\nHere's the Mermaid diagram visualizing the campaign flow:", '```mermaid\ngraph TD\n    A[Campaign Start] --> B[Phase 1: Awareness & Validation - Week 1]\n    B --> B1[X: Problem Posts, Teasers, #BuildInPublic]\n    B --> B2[X: Waitlist CTA & Early Access]\n    B --> B3[Community Outreach & Feedback]\n\n    B1 & B2 & B3 --> C[Phase 2: Launch & Acquisition - Week 2]\n    C --> C1[ProductHunt Launch Day]\n    C --> C2[X: Launch Announcement Thread]\n    C --> C3[Email: Waitlist Announcement & PH Support]\n\n    C1 --> C1a{PH Ranking & New Signups}\n    C2 --> C2a{X Engagement & New Signups}\n    C3 --> C3a{Email Driven Signups}\n\n    C1a & C2a & C3a --> D[Phase 3: Early Growth & Feedback - Weeks 3-4]\n    D --> D1[X: User Stories, Tips, Updates]\n    D --> D2[Email: Onboarding, Feedback Surveys]\n    D --> D3[In-App: Feedback & Support]\n    D --> D4{Target: 100 Active Users?}\n\n    D4 -- Yes --> E[Campaign Success: Continue Scaling]\n    D4 -- No --> F[Review & Iterate Product/Marketing]\n```', '\n\nWhat would you like to do next? We can start generating content for Phase 1, or you can refine any part of this strategy.']...
+
+✍️  2. Generating Content with A/B Variants...
+✅ Content generated!
+Output preview: Great! I've generated two tweet variants for your product launch:
+
+**Variant A:**
+*   **Content:** "We're thrilled to announce the official launch of [Product Name]! Our new platform helps technical founders streamline [specific process/pain point] with [key feature]. Discover how to boost your effi...
+
+📊 3. Analyzing Platform Metrics...
+✅ Analysis complete!
+Output preview: I encountered an error when trying to analyze the platform insights. It seems there was an issue with the request format.
+
+Could you please provide the platform insights or specify which platform you'd like me to analyze (e.g., "Analyze X (Twitter) platform insights")? This will help me recommend op...
+
+
+======================================================================
+  ✅ DEMO COMPLETE
+======================================================================
+
+All agents are working correctly!
+
+Next steps:
+  - Check the README.md for detailed usage
+  - Explore individual agent files for more examples
+  - Integrate with your React frontend
+  - Add real X API credentials for production
