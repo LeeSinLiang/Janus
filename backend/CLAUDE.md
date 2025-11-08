@@ -135,27 +135,51 @@ result = chain.invoke({"request": user_input})  # Returns dict
 
 ### State Management Pattern
 
-In-memory state using dataclasses in `state.py`:
+**Database-backed persistent storage** using Django ORM in `state.py` (migrated from in-memory):
+
 ```python
 from agents import state
 
-# Create campaign
+# Create campaign (saved to database)
 campaign = state.create_campaign(
     campaign_id="campaign_001",
     name="Product Launch",
     description="Launch campaign"
 )
 
-# Update strategy (stores Mermaid diagram)
+# Update strategy (stores Mermaid diagram in database)
 state.update_campaign_strategy(campaign_id, mermaid_diagram)
 
-# Add insights
+# Add insights (persisted to Campaign.insights JSON field)
 state.add_campaign_insight(campaign_id, "Engagement up 45%")
 
-# Agent memory
+# Agent memory (stored in AgentMemory model)
 state.update_agent_memory("agent_name", {"key": "value"})
 state.add_to_agent_history("agent_name", {"action": "...", "timestamp": "..."})
+
+# Add post with variants (creates Post and ContentVariant records)
+state.add_post_to_campaign(campaign_id, {
+    "post_id": "post_001",
+    "phase": "launch",
+    "status": "published",
+    "variants": [
+        {"variant_id": "A", "content": "Tweet A", "platform": "x"},
+        {"variant_id": "B", "content": "Tweet B", "platform": "x"}
+    ]
+})
+
+# Conversation history (saved to ConversationMessage model)
+state.add_to_conversation("user", "Create a campaign", campaign_id=campaign_id)
 ```
+
+**Django Models** (in `models.py`):
+- `Campaign`: Campaigns with phase, strategy (Mermaid), insights[], metadata{}
+- `Post`: Posts linked to campaigns with status, phase, metrics{}
+- `ContentVariant`: A/B variants linked to posts with content, platform, metadata{}
+- `AgentMemory`: Agent context{} and history[] stored as JSON
+- `ConversationMessage`: Conversation history with optional campaign link
+
+All data persists to SQLite database with indexed fields for performance.
 
 ## Agent-Specific Patterns
 
@@ -192,7 +216,9 @@ src/agents/
 ├── x_platform.py         # Layer 2: X/Twitter operations (agent)
 ├── metrics_analyzer.py   # Layer 2: Metrics analysis (agent)
 ├── tools.py              # Layer 1: Low-level @tool functions
-├── state.py              # In-memory state management (dataclasses)
+├── state.py              # Database-backed state management (Django ORM)
+├── models.py             # Django models: Campaign, Post, ContentVariant, etc.
+├── admin.py              # Django admin for managing campaigns and data
 └── data/
     └── placeholder_metrics.json  # Mock X API data for testing
 
@@ -210,10 +236,19 @@ src/janus/
 
 ## Django Integration
 
-- Apps: `core` (empty), `agents` (multi-agent system)
+- Apps: `core` (empty), `agents` (multi-agent system with database models)
 - Settings: `AGENT_SETTINGS` dict configures model temperatures per agent
+- Database: SQLite with Django ORM for persistent storage
+- Models: Campaign, Post, ContentVariant, AgentMemory, ConversationMessage
+- Admin: Full Django admin interface registered for all models
 - REST Framework configured but not yet used (future: API endpoints for React frontend)
 - Environment: Load `.env` with `python-dotenv` for `GOOGLE_API_KEY`
+
+**Database Schema:**
+- Campaigns track phases, store Mermaid diagrams, and link to posts
+- Posts have A/B variants (ContentVariant) and metrics stored as JSON
+- Agent memories persist context and history between sessions
+- Conversation messages optionally link to campaigns for context
 
 ## Future Extensions (Post-Hackathon)
 
@@ -221,6 +256,12 @@ From notes/janus.md:
 - Real X/Twitter API integration (currently placeholder)
 - ProductHunt API integration
 - Trigger detection engine (e.g., "if ER < 1.5% after 2h → swap variant B")
-- Long-term memory with PostgreSQL/Vector DB (currently in-memory)
+- Vector DB integration for semantic campaign search (current: SQLite)
+- Upgrade to PostgreSQL for production deployment
 - Django REST API for React frontend
 - ReactFlow canvas for visual campaign editing
+
+**Completed:**
+- ✅ Persistent database storage with Django ORM (migrated from in-memory)
+- ✅ Django admin interface for data management
+- ✅ Mermaid diagram storage in Campaign model
