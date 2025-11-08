@@ -3,10 +3,10 @@ Content Creator Agent
 Generates marketing content with A/B variants for testing.
 """
 
-from typing import List, Dict, Any, Optional
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
+import os
+from typing import Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.agents import create_agent
 from pydantic import BaseModel, Field
 
 
@@ -14,20 +14,10 @@ from pydantic import BaseModel, Field
 # Output Schema
 # =====================
 
-class ContentVariant(BaseModel):
-    """Schema for a single content variant"""
-    variant_id: str = Field(description="Variant identifier (A or B)")
-    content: str = Field(description="The actual tweet content (max 280 chars)")
-    hook: str = Field(description="The hook or angle used")
-    reasoning: str = Field(description="Why this variant might perform well")
-    hashtags: str = Field(description="Suggested hashtags")
-
-
 class ContentOutput(BaseModel):
-    """Schema for content creation output with A/B variants"""
-    topic: str = Field(description="The topic or theme")
-    variants: List[ContentVariant] = Field(description="Two variants (A and B)")
-    recommendation: str = Field(description="Which variant to test first and why")
+    """Schema for A/B content variants"""
+    A: str = Field(description="Variant A - Professional/direct approach")
+    B: str = Field(description="Variant B - Casual/engaging with emojis")
 
 
 # =====================
@@ -37,167 +27,190 @@ class ContentOutput(BaseModel):
 class ContentCreatorAgent:
     """
     Agent specialized in creating marketing content with A/B variants.
-    Generates 2 variants for every content request, optimized for engagement.
+    Generates 2 variants for every content request, optimized for X platform.
     """
 
-    def __init__(self, model_name: str = "gemini-2.5-flash", temperature: float = 0.7):
+    def __init__(self, model_name: str = None, temperature: float = 0):
         """
         Initialize the Content Creator Agent.
 
         Args:
-            model_name: Google Gemini model to use
-            temperature: Creativity level (0.0-1.0)
+            model_name: Google Gemini model to use (defaults to GEMINI_MODEL_CODE env var)
+            temperature: Creativity level (default: 0)
         """
-        self.model = ChatGoogleGenerativeAI(
+        if model_name is None:
+            model_name = os.getenv("GEMINI_MODEL_CODE", "gemini-2.5-flash")
+
+        # Initialize base model
+        base_model = ChatGoogleGenerativeAI(
             model=model_name,
             temperature=temperature
         )
 
-        # Set up structured output parser
-        self.parser = JsonOutputParser(pydantic_object=ContentOutput)
+        # Configure model for structured output using response_format
+        self.model = base_model.with_structured_output(ContentOutput)
 
-        # Create the prompt template
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", self._get_system_prompt()),
-            ("user", "{request}")
-        ])
-
-        # Create the chain
-        self.chain = self.prompt | self.model | self.parser
+        # Create the agent
+        self.agent = create_agent(
+            self.model,
+            tools=[],  # No tools needed for content generation
+            system_prompt=self._get_system_prompt()
+        )
 
     def _get_system_prompt(self) -> str:
         """Get the system prompt for content creation"""
         return """You are an expert marketing content creator specializing in social media for technical founders and SaaS products.
 
-Your task is to create engaging tweet content with A/B variants for testing.
+Your task is to create engaging tweet content with A/B variants for testing on X platform.
 
 RULES:
 1. Generate EXACTLY 2 variants (A and B) for every request
-2. Each tweet MUST be under 280 characters
-3. Variants should test different angles/hooks:
-   - Variant A: More direct/professional approach
-   - Variant B: More casual/engaging with emojis
-4. Focus on what resonates with technical founders, developers, and startup owners
-5. Include relevant hashtags (2-3 max)
-6. Consider optimal engagement patterns:
+2. Each tweet MUST be under 280 characters (X platform limit)
+3. Return PLAIN TEXT ONLY - NO markdown, NO formatting, NO code blocks
+4. Variant A: Professional/direct approach - clear, authoritative, value-focused
+5. Variant B: Casual/engaging with emojis - friendly, relatable, conversation-starter
+6. Focus on what resonates with technical founders, developers, and startup owners
+7. Consider optimal engagement patterns:
    - Medium length (100-200 chars) performs best
    - Emojis increase engagement by 45%
    - Questions and threads get more replies
    - Clear value propositions get more clicks
 
 OUTPUT FORMAT:
-Return a JSON object with this exact structure:
-{{
-  "topic": "brief description of the topic",
-  "variants": [
-    {{
-      "variant_id": "A",
-      "content": "the tweet text (max 280 chars)",
-      "hook": "the angle/hook used (e.g., 'pain point', 'social proof', 'curiosity')",
-      "reasoning": "why this variant might perform well",
-      "hashtags": "suggested hashtags"
-    }},
-    {{
-      "variant_id": "B",
-      "content": "alternative tweet text (max 280 chars)",
-      "hook": "different angle/hook",
-      "reasoning": "why this variant might perform well",
-      "hashtags": "suggested hashtags"
-    }}
-  ],
-  "recommendation": "which variant to test first and why"
-}}
+Return structured output with fields "A" and "B" containing plain text tweet content.
 
-IMPORTANT: Ensure ALL content is under 280 characters including hashtags!"""
+IMPORTANT:
+- Each variant must be under 280 characters
+- NO markdown formatting in the content
+- NO asterisks, NO bold, NO italics, NO code blocks
+- Just plain text tweets ready to post"""
 
-    def create_content(self, request: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(self, title: str, description: str, product_info: str) -> ContentOutput:
         """
-        Create content with A/B variants.
+        Generate A/B content variants.
 
         Args:
-            request: Content request (e.g., "Create a tweet announcing our product launch")
-            context: Optional context (campaign info, brand voice, previous performance)
+            title: Content title/topic
+            description: Content description
+            product_info: Product information
 
         Returns:
-            Dictionary with content variants and metadata
+            ContentOutput with A and B variants
         """
-        # Build the full request with context if provided
-        full_request = request
-        if context:
-            full_request += f"\n\nContext: {context}"
+        request = f"""Create two tweet variants for:
 
-        # Generate content
-        result = self.chain.invoke({"request": full_request})
+Title: {title}
+Description: {description}
+Product Info: {product_info}
 
-        return result
+Generate variant A (professional/direct) and variant B (casual/engaging with emojis).
+Each variant must be plain text under 280 characters."""
 
-    def create_thread_content(
+        result = self.agent.invoke({
+            "messages": [{"role": "user", "content": request}]
+        })
+
+        # Extract the structured output
+        output = self._extract_output(result)
+        return output
+
+    def execute_with_metrics(
         self,
-        topic: str,
-        num_tweets: int = 3,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        title: str,
+        description: str,
+        product_info: str,
+        old_content: str,
+        analyzed_report: str
+    ) -> ContentOutput:
         """
-        Create a Twitter thread with A/B variants for each tweet.
+        Generate improved A/B content variants based on metrics analysis (Scenario 3).
 
         Args:
-            topic: Thread topic
-            num_tweets: Number of tweets in the thread
-            context: Optional context
+            title: Content title/topic
+            description: Content description
+            product_info: Product information
+            old_content: Previous content that was tested
+            analyzed_report: Metrics analysis report with insights
 
         Returns:
-            Dictionary with thread content and variants
+            ContentOutput with improved A and B variants based on metrics
         """
-        request = f"""Create a Twitter thread about: {topic}
+        request = f"""Create two IMPROVED tweet variants based on metrics analysis:
 
-The thread should have {num_tweets} tweets.
-For EACH tweet in the thread, generate 2 variants (A and B).
+Title: {title}
+Description: {description}
+Product Info: {product_info}
 
-Structure the thread to:
-1. Hook (grab attention)
-2. Value/Information (deliver key points)
-3. Call-to-action (end with engagement prompt)
+PREVIOUS CONTENT:
+{old_content}
 
-Return all tweets with their A/B variants."""
+METRICS ANALYSIS:
+{analyzed_report}
 
-        if context:
-            request += f"\n\nContext: {context}"
+Based on the metrics analysis above, generate improved variants:
+- Variant A (professional/direct): Apply insights to create a more effective professional variant
+- Variant B (casual/engaging with emojis): Apply insights to create a more engaging casual variant
 
-        # For threads, we'll make multiple calls
-        # For now, return a simplified version
-        result = self.chain.invoke({"request": request})
+Each variant must be plain text under 280 characters.
+Use the analyzed report to understand what worked and what didn't, then create better versions."""
 
-        return result
+        result = self.agent.invoke({
+            "messages": [{"role": "user", "content": request}]
+        })
 
-    def refine_variant(
-        self,
-        original_content: str,
-        feedback: str,
-        metrics: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        # Extract the structured output
+        output = self._extract_output(result)
+        return output
+
+    def _extract_output(self, result: Dict[str, Any]) -> ContentOutput:
         """
-        Refine a content variant based on feedback or metrics.
+        Extract ContentOutput from agent result.
 
         Args:
-            original_content: The original tweet content
-            feedback: Feedback or improvement direction
-            metrics: Optional metrics from previous similar content
+            result: Agent invocation result
 
         Returns:
-            Refined content with variants
+            ContentOutput object
         """
-        request = f"""Refine this tweet content: "{original_content}"
+        # The agent with structured output should return it in messages
+        messages = result.get("messages", [])
+        if messages:
+            last_message = messages[-1]
 
-Feedback/Direction: {feedback}"""
+            # If it's already a ContentOutput, return it
+            if isinstance(last_message, ContentOutput):
+                return last_message
 
-        if metrics:
-            request += f"\n\nPrevious metrics: {metrics}"
+            # If it has content, try to parse it
+            if hasattr(last_message, 'content'):
+                content = last_message.content
 
-        request += "\n\nGenerate 2 improved variants (A and B) based on the feedback."
+                # If content is already a ContentOutput instance
+                if isinstance(content, ContentOutput):
+                    return content
 
-        result = self.chain.invoke({"request": request})
+                # If content is a dict, create ContentOutput
+                if isinstance(content, dict):
+                    return ContentOutput(**content)
 
-        return result
+                # If content is a string, try to parse as JSON
+                if isinstance(content, str):
+                    import json
+                    try:
+                        data = json.loads(content)
+                        return ContentOutput(**data)
+                    except:
+                        # Fallback - return error message
+                        return ContentOutput(
+                            A="Error: Could not parse variant A",
+                            B="Error: Could not parse variant B"
+                        )
+
+        # Fallback if no messages
+        return ContentOutput(
+            A="Error: No output generated for variant A",
+            B="Error: No output generated for variant B"
+        )
 
 
 # =====================
@@ -219,28 +232,48 @@ def create_content_creator() -> ContentCreatorAgent:
 # =====================
 
 if __name__ == "__main__":
-    # Example: Create content
+    # Example 1: Basic content creation
+    print("="*60)
+    print("Example 1: Basic Content Creation")
+    print("="*60)
+
     agent = create_content_creator()
 
-    result = agent.create_content(
-        request="Create a tweet announcing our AI-powered marketing automation tool for technical founders",
-        context={
-            "brand_voice": "helpful, technical, friendly",
-            "target_audience": "technical founders, developers",
-            "product": "Janus - AI GTM OS"
-        }
+    result = agent.execute(
+        title="AI Marketing Automation Launch",
+        description="Announcing our AI-powered marketing automation tool",
+        product_info="Janus - AI GTM OS for technical founders"
     )
 
-    print("Content Creation Result:")
-    print(f"Topic: {result['topic']}")
-    print("\n--- Variant A ---")
-    print(f"Content: {result['variants'][0]['content']}")
-    print(f"Hook: {result['variants'][0]['hook']}")
-    print(f"Hashtags: {result['variants'][0]['hashtags']}")
-    print(f"Reasoning: {result['variants'][0]['reasoning']}")
-    print("\n--- Variant B ---")
-    print(f"Content: {result['variants'][1]['content']}")
-    print(f"Hook: {result['variants'][1]['hook']}")
-    print(f"Hashtags: {result['variants'][1]['hashtags']}")
-    print(f"Reasoning: {result['variants'][1]['reasoning']}")
-    print(f"\nRecommendation: {result['recommendation']}")
+    print("\n--- Variant A (Professional/Direct) ---")
+    print(f"Length: {len(result.A)} chars")
+    print(result.A)
+
+    print("\n--- Variant B (Casual/Engaging) ---")
+    print(f"Length: {len(result.B)} chars")
+    print(result.B)
+
+    # Example 2: Content with metrics-based improvement
+    print("\n" + "="*60)
+    print("Example 2: Metrics-Based Content Improvement (Scenario 3)")
+    print("="*60)
+
+    result_with_metrics = agent.execute_with_metrics(
+        title="Product Update Announcement",
+        description="New feature release with AI capabilities",
+        product_info="Janus - AI GTM OS",
+        old_content="Variant A: Just shipped a major update to Janus. Check it out.\nVariant B: 🚀 New Janus update is live! You're gonna love this 💪",
+        analyzed_report="""Analysis Summary:
+- Variant B performed 3x better (45% engagement rate vs 15% for variant A)
+- Emojis and enthusiasm drove significantly higher engagement
+- Key weakness: Neither variant clearly stated what the update includes
+- Recommendation: Keep casual tone and emojis, but add specific value proposition"""
+    )
+
+    print("\n--- Improved Variant A (Professional/Direct) ---")
+    print(f"Length: {len(result_with_metrics.A)} chars")
+    print(result_with_metrics.A)
+
+    print("\n--- Improved Variant B (Casual/Engaging) ---")
+    print(f"Length: {len(result_with_metrics.B)} chars")
+    print(result_with_metrics.B)

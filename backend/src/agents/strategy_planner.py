@@ -1,42 +1,23 @@
 """
 Strategy Planner Agent
-Creates marketing strategies, campaigns, and generates Mermaid diagrams.
-Maintains campaign context and memory.
+Creates GTM strategies and generates Mermaid diagrams with structured phases.
+Converted to agent pattern with structured output.
 """
 
-from typing import Dict, Any, Optional, List
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
+import os
+from typing import Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.agents import create_agent
 from pydantic import BaseModel, Field
-from .state import state, Campaign
-from datetime import datetime
-import uuid
 
 
 # =====================
-# Output Schemas
+# Output Schema
 # =====================
-
-class CampaignPhaseNode(BaseModel):
-    """Schema for a campaign phase"""
-    phase_id: str = Field(description="Unique phase identifier")
-    phase_name: str = Field(description="Phase name (e.g., 'Awareness', 'Launch', 'Growth')")
-    duration: str = Field(description="Duration of this phase")
-    channels: List[str] = Field(description="Marketing channels for this phase")
-    objectives: List[str] = Field(description="Key objectives")
-    content_themes: List[str] = Field(description="Content themes and topics")
-
 
 class StrategyOutput(BaseModel):
-    """Schema for strategy planning output"""
-    campaign_name: str = Field(description="Campaign name")
-    campaign_goal: str = Field(description="Overall campaign goal")
-    target_audience: str = Field(description="Target audience description")
-    phases: List[CampaignPhaseNode] = Field(description="Campaign phases")
-    mermaid_diagram: str = Field(description="Mermaid diagram representation")
-    key_metrics: List[str] = Field(description="Key metrics to track")
-    success_criteria: str = Field(description="What defines success")
+    """Output schema for strategy planning with Mermaid diagram"""
+    diagram: str = Field(description="Mermaid diagram representation of the GTM strategy")
 
 
 # =====================
@@ -45,342 +26,163 @@ class StrategyOutput(BaseModel):
 
 class StrategyPlannerAgent:
     """
-    Agent specialized in creating marketing strategies and campaign plans.
-    Generates Mermaid diagrams for visualization and maintains campaign memory.
+    Agent specialized in creating GTM strategies with Mermaid diagrams.
+    Uses agent pattern with structured output for diagram generation.
     """
 
-    def __init__(self, model_name: str = "gemini-2.5-flash", temperature: float = 0.6):
-        """
-        Initialize the Strategy Planner Agent.
+    def __init__(self):
+        """Initialize the Strategy Planner Agent with agent pattern."""
+        # Get model name from environment variable
+        model_name = os.getenv("GEMINI_MODEL_CODE", "gemini-2.5-flash")
 
-        Args:
-            model_name: Google Gemini model to use
-            temperature: Moderate temperature for creative yet structured planning
-        """
+        # Create base model with temperature 0 for consistent output
         self.model = ChatGoogleGenerativeAI(
             model=model_name,
-            temperature=temperature
+            temperature=0
         )
 
-        # Set up structured output parser
-        self.parser = JsonOutputParser(pydantic_object=StrategyOutput)
+        # Create agent (no tools needed for this use case)
+        self.agent = create_agent(
+            self.model,
+            tools=[],  # No external tools needed
+            system_prompt=self._get_system_prompt()
+        )
 
-        # Create the prompt template
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", self._get_system_prompt()),
-            ("user", "{request}")
-        ])
-
-        # Create the chain
-        self.chain = self.prompt | self.model | self.parser
-
-        # Agent name for memory storage
+        # Agent name for reference
         self.agent_name = "strategy_planner"
 
     def _get_system_prompt(self) -> str:
-        """Get the system prompt for strategy planning"""
-        return """You are an expert marketing strategist specializing in go-to-market strategies for SaaS products and technical startups.
+        """Get the system prompt for strategy planning with strict format requirements"""
+        return """You are an expert GTM (Go-To-Market) strategist specializing in SaaS products and technical founders.
 
-Your task is to create comprehensive, phased marketing campaigns with clear visualization.
+Your task is to create a phased marketing strategy and generate a Mermaid diagram visualization.
 
-STRATEGY FRAMEWORK:
-1. Understand the product, audience, and goals
-2. Break down the campaign into phases (typically 3-5 phases):
-   - Pre-Launch/Awareness
-   - Launch
-   - Growth/Scaling
-   - Retention/Optimization
-3. For each phase, define:
-   - Objectives
-   - Marketing channels
-   - Content themes
-   - Duration
-   - Success metrics
-4. Generate a Mermaid diagram showing the campaign flow
+CRITICAL REQUIREMENTS - YOU MUST FOLLOW EXACTLY:
 
-MERMAID DIAGRAM FORMAT:
-Create a flowchart showing:
-- Campaign phases as nodes
-- Channels within each phase
-- Flow between phases
-- Decision points (if applicable)
+1. EXACTLY 3 PHASES (NO MORE, NO LESS):
+   - Phase 1: Pre-launch/Awareness phase
+   - Phase 2: Launch phase
+   - Phase 3: Post-launch/Growth phase
 
-Example structure:
-```mermaid
-graph TD
-    A[Campaign Start] --> B[Phase 1: Awareness]
-    B --> B1[X Platform Posts]
-    B --> B2[ProductHunt Teaser]
-    B1 --> C[Phase 2: Launch]
-    B2 --> C
-    C --> C1[ProductHunt Launch]
-    C --> C2[X Announcement Thread]
-    C1 --> D[Phase 3: Growth]
-    C2 --> D
-    D --> D1[Content Marketing]
-    D --> D2[A/B Testing]
+2. MERMAID FORMAT (EXACT SYNTAX REQUIRED):
+   - Start with: graph TB
+   - Create 3 subgraphs with exact names: "Phase 1", "Phase 2", "Phase 3"
+   - Node IDs: NODE1, NODE2, NODE3, etc. (sequential numbering)
+   - Custom node format: NODEX[<title>Title Text</title><description>Description Text</description>]
+   - Include connections between nodes using arrows: -->
+
+3. CUSTOM NODE FORMAT (REQUIRED):
+   Each node MUST contain both title and description tags:
+   - <title>: Short action item (3-5 words)
+   - <description>: Brief explanation (5-10 words)
+
+4. CONNECTIONS:
+   - Connect nodes within and across phases
+   - Show logical flow from Phase 1 → Phase 2 → Phase 3
+   - Use format: NODE1 --> NODE2
+
+EXAMPLE OUTPUT FORMAT:
+```
+graph TB
+    subgraph "Phase 1"
+        NODE1[<title>Post demo to X</title><description>Build hype with demo video</description>]
+        NODE2[<title>Engage communities</title><description>Post in relevant subreddits</description>]
+    end
+    subgraph "Phase 2"
+        NODE3[<title>ProductHunt launch</title><description>Launch on ProductHunt</description>]
+        NODE4[<title>Announcement thread</title><description>Post launch thread on X</description>]
+    end
+    subgraph "Phase 3"
+        NODE5[<title>A/B testing</title><description>Test different messaging</description>]
+        NODE6[<title>Content marketing</title><description>Publish technical blog posts</description>]
+    end
+    NODE1 --> NODE2
+    NODE2 --> NODE3
+    NODE3 --> NODE4
+    NODE4 --> NODE5
+    NODE5 --> NODE6
 ```
 
-TARGET AUDIENCE CONSIDERATIONS:
-- Technical founders: Prefer data-driven, practical content
-- Developers: Value technical depth and authenticity
-- Startup owners: Care about ROI and efficiency
+STRATEGY GUIDELINES:
+- Phase 1 (Pre-Launch): Community building, teasers, early awareness, waitlist
+- Phase 2 (Launch): ProductHunt, official announcements, press, launch offers
+- Phase 3 (Growth): Content marketing, A/B testing, optimization, scaling, partnerships
 
-OUTPUT FORMAT:
-Return a JSON object with this structure:
-{{
-  "campaign_name": "string",
-  "campaign_goal": "string",
-  "target_audience": "string",
-  "phases": [
-    {{
-      "phase_id": "phase_1",
-      "phase_name": "Awareness",
-      "duration": "2 weeks",
-      "channels": ["X", "ProductHunt"],
-      "objectives": ["Build anticipation", "Gather early feedback"],
-      "content_themes": ["Problem statement", "Sneak peeks"]
-    }}
-  ],
-  "mermaid_diagram": "graph TD\\n    A[Start] --> B[Phase 1]",
-  "key_metrics": ["engagement_rate", "follower_growth", "signups"],
-  "success_criteria": "string describing success"
-}}
+BEST PRACTICES FOR TECHNICAL FOUNDERS:
+- Focus on authentic, technical-first content
+- Leverage developer communities (X, Reddit, HackerNews)
+- Emphasize ProductHunt for visibility
+- Use data-driven approaches (A/B testing, metrics)
+- Build in public when possible
 
-Be strategic, data-driven, and create actionable plans."""
+OUTPUT REQUIREMENTS:
+Return ONLY the Mermaid diagram code. Do NOT include markdown code blocks, explanations, or additional text.
+Start directly with "graph TB" and include the complete diagram."""
 
-    def create_strategy(
-        self,
-        product_info: str,
-        campaign_goal: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    def execute(self, product_description: str, gtm_goals: str) -> StrategyOutput:
         """
-        Create a marketing strategy and campaign plan.
+        Execute strategy planning and generate Mermaid diagram.
 
         Args:
-            product_info: Information about the product
-            campaign_goal: Main goal of the campaign
-            context: Optional context (budget, timeline, constraints)
+            product_description: Description of the product to market
+            gtm_goals: GTM goals and objectives
 
         Returns:
-            Strategy output with phases and Mermaid diagram
+            StrategyOutput containing the Mermaid diagram
         """
-        request = f"""Create a marketing strategy for:
+        # Build the user request
+        user_request = f"""Create a GTM strategy for:
 
-Product: {product_info}
-Campaign Goal: {campaign_goal}"""
+Product: {product_description}
 
-        if context:
-            request += f"\n\nAdditional Context: {context}"
+GTM Goals: {gtm_goals}
 
-        request += "\n\nGenerate a phased campaign plan with a Mermaid diagram."
+Generate a Mermaid diagram following the required format with exactly 3 phases."""
 
-        # Generate strategy
-        result = self.chain.invoke({"request": request})
+        # Invoke the agent
+        result = self.agent.invoke({
+            "messages": [{"role": "user", "content": user_request}]
+        })
 
-        # Store in memory
-        campaign_id = str(uuid.uuid4())
-        self._save_to_memory(campaign_id, result)
+        # Extract diagram from agent response
+        diagram_content = self._extract_diagram(result)
 
-        return {
-            **result,
-            "campaign_id": campaign_id
-        }
+        # Return structured output
+        return StrategyOutput(diagram=diagram_content)
 
-    def update_strategy(
-        self,
-        campaign_id: str,
-        updates: str,
-        metrics: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    def _extract_diagram(self, agent_result: Dict[str, Any]) -> str:
         """
-        Update an existing strategy based on new information or metrics.
+        Extract the Mermaid diagram from agent result.
 
         Args:
-            campaign_id: The campaign to update
-            updates: Description of what to update
-            metrics: Optional metrics to inform updates
+            agent_result: Result from agent invocation
 
         Returns:
-            Updated strategy
+            Cleaned Mermaid diagram string
         """
-        # Get existing campaign from memory
-        campaign = state.get_campaign(campaign_id)
+        # Get the last message from the agent
+        messages = agent_result.get("messages", [])
+        if not messages:
+            return "graph TB\n    NODE1[<title>Error</title><description>No output generated</description>]"
 
-        if not campaign:
-            return {"error": f"Campaign {campaign_id} not found"}
+        last_message = messages[-1]
 
-        request = f"""Update this marketing strategy:
-
-Current Campaign: {campaign.name}
-Current Strategy: {campaign.strategy if campaign.strategy else 'Not yet defined'}
-
-Updates needed: {updates}"""
-
-        if metrics:
-            request += f"\n\nCurrent Metrics: {metrics}"
-
-        request += "\n\nGenerate an updated strategy and Mermaid diagram."
-
-        # Generate updated strategy
-        result = self.chain.invoke({"request": request})
-
-        # Update memory
-        self._save_to_memory(campaign_id, result)
-
-        return {
-            **result,
-            "campaign_id": campaign_id
-        }
-
-    def create_phase_plan(
-        self,
-        campaign_id: str,
-        phase_name: str,
-        duration: str
-    ) -> Dict[str, Any]:
-        """
-        Create a detailed plan for a specific campaign phase.
-
-        Args:
-            campaign_id: The campaign this phase belongs to
-            phase_name: Name of the phase
-            duration: Duration of the phase
-
-        Returns:
-            Detailed phase plan
-        """
-        campaign = state.get_campaign(campaign_id)
-
-        request = f"""Create a detailed plan for this campaign phase:
-
-Campaign: {campaign.name if campaign else 'Unknown'}
-Phase: {phase_name}
-Duration: {duration}
-
-Provide:
-1. Daily/weekly content calendar
-2. Specific post ideas
-3. Channel-specific tactics
-4. Success metrics
-5. Contingency plans"""
-
-        result = self.chain.invoke({"request": request})
-
-        # Add to campaign insights
-        if campaign:
-            state.add_campaign_insight(
-                campaign_id,
-                f"Phase plan created for {phase_name}: {result.get('mermaid_diagram', '')}"
-            )
-
-        return result
-
-    def generate_mermaid_diagram(
-        self,
-        campaign_structure: Dict[str, Any]
-    ) -> str:
-        """
-        Generate a Mermaid diagram from campaign structure.
-
-        Args:
-            campaign_structure: Campaign phases and structure
-
-        Returns:
-            Mermaid diagram string
-        """
-        request = f"""Generate a Mermaid flowchart diagram for this campaign structure:
-
-{campaign_structure}
-
-Create a clear, visual flowchart showing:
-- All phases
-- Channels within each phase
-- Flow between phases
-- Decision points
-
-Return ONLY the Mermaid diagram code (starting with 'graph TD')."""
-
-        # Use the model directly for this simpler task
-        response = self.model.invoke(request)
-
-        # Extract mermaid code from response
-        if hasattr(response, 'content'):
-            mermaid_code = str(response.content)
+        # Extract content
+        if hasattr(last_message, 'content'):
+            content = last_message.content
         else:
-            mermaid_code = str(response)
+            content = str(last_message)
 
-        return mermaid_code.strip()
+        # Clean up the content (remove markdown code blocks if present)
+        content = content.strip()
 
-    def _save_to_memory(self, campaign_id: str, strategy_data: Dict[str, Any]):
-        """
-        Save strategy to memory.
+        # Remove markdown code blocks if present
+        if content.startswith("```mermaid"):
+            content = content.replace("```mermaid", "").replace("```", "").strip()
+        elif content.startswith("```"):
+            content = content.replace("```", "").strip()
 
-        Args:
-            campaign_id: Campaign identifier
-            strategy_data: Strategy data to save
-        """
-        # Update or create campaign in state
-        campaign = state.get_campaign(campaign_id)
-
-        if not campaign:
-            # Create new campaign
-            campaign = state.create_campaign(
-                campaign_id=campaign_id,
-                name=strategy_data.get("campaign_name", "Unnamed Campaign"),
-                description=strategy_data.get("campaign_goal", "")
-            )
-
-        # Update campaign with strategy
-        state.update_campaign_strategy(
-            campaign_id,
-            strategy_data.get("mermaid_diagram", "")
-        )
-
-        # Update agent memory
-        state.update_agent_memory(
-            self.agent_name,
-            {
-                "last_campaign": campaign_id,
-                "last_update": datetime.now().isoformat()
-            }
-        )
-
-        # Add to agent history
-        state.add_to_agent_history(
-            self.agent_name,
-            {
-                "action": "strategy_created",
-                "campaign_id": campaign_id,
-                "campaign_name": strategy_data.get("campaign_name", "")
-            }
-        )
-
-    def get_campaign_from_memory(self, campaign_id: str) -> Optional[Campaign]:
-        """
-        Retrieve campaign from memory.
-
-        Args:
-            campaign_id: Campaign identifier
-
-        Returns:
-            Campaign object if found
-        """
-        return state.get_campaign(campaign_id)
-
-    def get_agent_memory(self) -> Dict[str, Any]:
-        """
-        Get agent's memory context.
-
-        Returns:
-            Agent memory data
-        """
-        memory = state.get_agent_memory(self.agent_name)
-        return {
-            "context": memory.context,
-            "recent_history": memory.history[-5:] if memory.history else []
-        }
+        return content
 
 
 # =====================
@@ -405,22 +207,14 @@ if __name__ == "__main__":
     # Example: Create a strategy
     agent = create_strategy_planner()
 
-    result = agent.create_strategy(
-        product_info="Janus - AI-powered GTM OS that automates marketing for technical founders",
-        campaign_goal="Launch product and acquire first 100 users",
-        context={
-            "timeline": "4 weeks",
-            "budget": "low",
-            "channels": ["X", "ProductHunt"]
-        }
+    result = agent.execute(
+        product_description="Janus - AI-powered GTM OS that automates marketing for technical founders",
+        gtm_goals="Launch product and acquire first 100 users in 4 weeks"
     )
 
-    print("Strategy Created:")
-    print(f"Campaign: {result['campaign_name']}")
-    print(f"Goal: {result['campaign_goal']}")
-    print(f"\nPhases ({len(result['phases'])}):")
-    for phase in result['phases']:
-        print(f"  - {phase['phase_name']}: {phase['duration']}")
-    print(f"\nMermaid Diagram:")
-    print(result['mermaid_diagram'])
-    print(f"\nCampaign ID: {result['campaign_id']}")
+    print("Generated Strategy Diagram:")
+    print("=" * 60)
+    print(result.diagram)
+    print("=" * 60)
+    print(f"\nDiagram type: {type(result).__name__}")
+    print(f"Diagram length: {len(result.diagram)} characters")
