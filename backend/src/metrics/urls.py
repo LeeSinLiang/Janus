@@ -9,5 +9,4 @@ urlpatterns = [
     path('getXPostMetrics/', views.getXPostMetrics, name='getXPostMetrics'),
     path('api/approve', views.approveNode, name='approveNode'),
     path('api/graph', views.rejectNode, name='rejectNode'),
-    
 ]

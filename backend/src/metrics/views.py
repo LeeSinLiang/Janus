@@ -1,6 +1,5 @@
 from django.shortcuts import render
-import os
-import requests
+import base64, hashlib, os, secrets, urllib.parse, requests
 from dotenv import load_dotenv
 from django.conf import settings
 from .models import PostMetrics
@@ -16,7 +15,6 @@ auth = OAuth1(
     settings.X_ACCESS_TOKEN,
     settings.X_ACCESS_TOKEN_SECRET,
 )
-
 
 
 # Create your views here.
