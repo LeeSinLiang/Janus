@@ -112,17 +112,16 @@ function createReactFlowNode(
 }
 
 /**
- * Convert next_post relationships to ReactFlow edge format
+ * Convert next_posts relationships to ReactFlow edge format
  */
 function convertEdgesToReactFlow(diagramNodes: DiagramNode[]): Edge[] {
   const edges: Edge[] = [];
-  let edgeIndex = 0;
 
   diagramNodes.forEach((node) => {
-    // Create an edge for each connection in next_post
-    node.next_post.forEach((targetPk) => {
+    // Create an edge for each connection in next_posts
+    node.next_posts.forEach((targetPk) => {
       edges.push({
-        id: `e${edgeIndex++}`,
+        id: `e${node.pk}-${targetPk}`, // Stable ID based on source and target
         source: String(node.pk),
         target: String(targetPk),
         markerEnd: { type: MarkerType.ArrowClosed, color: '#94A3B8' },

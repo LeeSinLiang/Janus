@@ -8,7 +8,10 @@ class PostMetrics(models.Model):
     tweet_id = models.CharField(max_length=50)
 
     def __str__(self):
-        return f"{self.post_set.first().post_id} Metrics"
+        post = self.post_set.first()
+        if post and post.post_id:
+            return f"{post.post_id} Metrics"
+        return f"PostMetrics #{self.pk}"
     
 
 

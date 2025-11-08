@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
-import { fetchGraphData, fetchGraphDataMock } from '@/services/api';
+import { fetchGraphData, fetchGraphDataMock, fetchGraphDataV1, fetchGraphDataV2 } from '@/services/api';
 import { parseGraphData } from '@/utils/graphParser';
 import { diffGraphData, applyGraphDiff } from '@/utils/graphDiff';
 
@@ -31,7 +31,7 @@ interface UseGraphDataReturn {
  * @returns Graph data, loading state, error state, and manual refetch function
  */
 export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataReturn {
-  const { pollingInterval = 5000, useMockData = true } = options;
+  const { pollingInterval = 5000, useMockData = false } = options;
 
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -48,7 +48,18 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
   const fetchAndProcessData = useCallback(async () => {
     try {
       // Use mock or real API based on configuration
-      const data = useMockData ? await fetchGraphDataMock() : await fetchGraphData();
+      let data;
+      if (useMockData) {
+        data = await fetchGraphDataMock();
+      } else {
+        // Use V1 which returns plain array, wrap it in expected format
+        const diagramNodes = await fetchGraphDataV1();
+        data = {
+          diagram: diagramNodes,
+          metrics: [], // No metrics from backend yet
+          changes: true, // Always process on fetch
+        };
+      }
 
       // Always load data on initial fetch, then check changes flag for subsequent polls
       const shouldProcess = isInitialLoadRef.current || data.changes;

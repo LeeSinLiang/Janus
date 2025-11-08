@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
 import os
 import requests
 from dotenv import load_dotenv
@@ -60,3 +61,52 @@ def getXPostMetrics(request, tweet_id):
         return Response(resp.json(), status=200)
     else:
         return Response({"error": resp.json()}, status=resp.status_code)
+
+@api_view(['POST'])
+def approveNode(request):
+    """Approve a pending node"""
+    node_name = request.data.get("node_name")
+    if not node_name:
+        return Response({"error": "Missing 'node_name' field"}, status=400)
+
+    # Find the post by title
+    try:
+        post = Post.objects.get(title=node_name)
+        # Mark as approved (you can add an 'approved' field to the model later)
+        # For now, just return success
+        return Response({
+            "success": True,
+            "message": f"Node '{node_name}' approved",
+            "post_id": post.pk
+        }, status=200)
+    except Post.DoesNotExist:
+        return Response({
+            "error": f"Post with title '{node_name}' not found"
+        }, status=404)
+
+@api_view(['POST'])
+def rejectNode(request):
+    """Reject a pending node and remove it"""
+    node_name = request.data.get("node_name")
+    reject_message = request.data.get("reject_message", "")
+
+    if not node_name:
+        return Response({"error": "Missing 'node_name' field"}, status=400)
+
+    # Find the post by title
+    try:
+        post = Post.objects.get(title=node_name)
+        post_id = post.pk
+        # Delete the post
+        post.delete()
+
+        return Response({
+            "success": True,
+            "message": f"Node '{node_name}' rejected and removed",
+            "reject_message": reject_message,
+            "post_id": post_id
+        }, status=200)
+    except Post.DoesNotExist:
+        return Response({
+            "error": f"Post with title '{node_name}' not found"
+        }, status=404)

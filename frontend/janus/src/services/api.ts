@@ -1,11 +1,74 @@
-import { GraphResponse, ApiError } from '@/types/api';
+import { DiagramNode, GraphResponse, ApiError } from '@/types/api';
 
 // Configure your API endpoint here
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const GRAPH_ENDPOINT = '/api/graph';
 
 /**
- * Fetch graph data from the backend
+ * Fetch graph data from the backend (Version 1)
+ * Expects plain Post[] array from /nodesJson/
+ */
+export async function fetchGraphDataV1(): Promise<DiagramNode[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/nodesJson/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // Add credentials if needed for authentication
+      // credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error: ApiError = {
+        message: `API request failed: ${response.statusText}`,
+        status: response.status,
+      };
+      throw error;
+    }
+
+    const data: DiagramNode[] = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching graph data V1:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch graph data from the backend (Version 2)
+ * Expects enriched format with diagram, metrics, and changes from /nodesJson/
+ */
+export async function fetchGraphDataV2(): Promise<GraphResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/nodesJson/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // Add credentials if needed for authentication
+      // credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error: ApiError = {
+        message: `API request failed: ${response.statusText}`,
+        status: response.status,
+      };
+      throw error;
+    }
+
+    const data: GraphResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching graph data V2:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch graph data from the backend (Legacy)
+ * @deprecated Use fetchGraphDataV1() or fetchGraphDataV2() instead
  */
 export async function fetchGraphData(): Promise<GraphResponse> {
   try {
@@ -89,38 +152,43 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 500));
 
-  // Return mock data matching new JSON format
+  // Return mock data matching backend format with next_posts (plural) and phase
   return {
     diagram: [
       {
         pk: 1,
         title: 'Instagram post',
         description: 'Create an Instagram carousel post (5 slides) highlighting our top features. Create an Instagram carousel post.',
-        next_post: [2, 3],
+        next_posts: [2],
+        phase: 'Phase 1',
       },
       {
         pk: 2,
         title: 'X post',
         description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
-        next_post: [4, 3],
+        next_posts: [3],
+        phase: 'Phase 1',
       },
       {
         pk: 3,
         title: 'Instagram Reels',
         description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
-        next_post: [5],
+        next_posts: [],
+        phase: 'Phase 2',
       },
       {
         pk: 4,
         title: 'Youtube Shorts',
         description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
-        next_post: [5],
+        next_posts: [2, 5],
+        phase: 'Phase 2',
       },
       {
         pk: 5,
         title: 'Video Marketing',
         description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
-        next_post: [],
+        next_posts: [],
+        phase: 'Phase 3',
       },
     ],
     metrics: [

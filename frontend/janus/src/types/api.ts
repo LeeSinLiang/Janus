@@ -6,7 +6,8 @@ export interface DiagramNode {
   pk: number;
   title: string;
   description: string;
-  next_post: number[];
+  next_posts: number[];
+  phase: string;
 }
 
 export interface NodeMetrics {

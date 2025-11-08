@@ -61,7 +61,7 @@ export default function CanvasWithPolling() {
   // The hook now handles all diffing internally and preserves positions
   const { nodes, edges, loading, error, setNodes, setEdges } = useGraphData({
     pollingInterval: 5000,
-    useMockData: true, // Set to false when connecting to real backend
+    useMockData: false, // Set to false when connecting to real backend
   });
 
   // Approve a pending node
