@@ -153,7 +153,7 @@ export default function ChatBox({
                   Rejecting node: {rejectionState.nodeName}
                 </span>
                 <p className="mt-1 text-xs text-red-700">
-                  Please explain why you're rejecting this node
+                  Provide suggestion to better the strategy!
                 </p>
               </div>
               <button
@@ -184,7 +184,7 @@ export default function ChatBox({
           <div className="mb-3">
             <span className="text-base font-semibold text-orange-500">Janus:</span>
             <span className="ml-2 text-sm text-zinc-700">
-              Create an Instagram carousel post (5 slides) highlighting our top features.
+              How can I help with your marketing roadmap?
             </span>
           </div>
         )}
@@ -193,7 +193,7 @@ export default function ChatBox({
         {!rejectionState && (
           <div className="mb-2">
             <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
-              @ add context
+              @ to add context
             </button>
           </div>
         )}
@@ -205,7 +205,7 @@ export default function ChatBox({
             value={message}
             onChange={handleMessageChange}
             onKeyDown={handleKeyDown}
-            placeholder={rejectionState ? "Explain why you're rejecting this node..." : "Write your message ..."}
+            placeholder={rejectionState ? "Explain why you're rejecting this node..." : "Change triggers for marketing strategy..."}
             className={`w-full resize-none rounded-lg border px-3 py-2 pr-32 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-1 ${
               rejectionState
                 ? 'border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-400'
