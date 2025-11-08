@@ -120,6 +120,31 @@ export async function approveNode(nodePk: string): Promise<void> {
 }
 
 /**
+ * Create X post from a node - sends POST request with node pk
+ */
+export async function createXPost(nodePk: string): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/createXPost/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pk: nodePk }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create X post: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error creating X post:', error);
+    throw error;
+  }
+}
+
+/**
  * Reject a node - sends POST request with node pk and rejection message
  */
 export async function rejectNode(nodePk: string, rejectMessage: string): Promise<void> {

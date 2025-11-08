@@ -67,9 +67,10 @@ def createXPost(request):
 		tweet_id = (data.get("data")).get("id")
 		if tweet_id:
 			postMetrics = post.metrics
-			postMetrics.tweet_id = tweet_id
+			if postMetrics:
+				postMetrics.tweet_id = tweet_id
+				postMetrics.save()
 			post.status = "published"
-			postMetrics.save()
 			post.save()
 
 	return Response(resp.json(), status=resp.status_code)
