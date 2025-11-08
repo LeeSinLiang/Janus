@@ -3,10 +3,14 @@
 import { useEffect, useRef } from 'react';
 
 interface Variant {
-  title: string;
-  description: string;
-  icon?: string;
-  iconBg?: string;
+  variant_id: string;
+  content: string;
+  platform: string;
+  metadata: {
+    hook?: string;
+    reasoning?: string;
+    hashtags?: string[];
+  };
 }
 
 interface NodeVariantModalProps {
@@ -98,25 +102,41 @@ export default function NodeVariantModal({
             onClick={() => onSelectVariant?.(1)}
             className="group rounded-xl border-2 border-zinc-200 p-6 text-left transition-all hover:border-blue-400 hover:bg-blue-50/50"
           >
-            <div className="mb-4 flex items-start gap-3">
-              {variant1.icon && variant1.iconBg && (
-                <div
-                  className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: variant1.iconBg }}
-                >
-                  <span className="text-2xl">{variant1.icon}</span>
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-zinc-900 mb-2">
+                Version {variant1.variant_id}
+              </h3>
+              {variant1.metadata.hook && (
+                <div className="mb-3">
+                  <p className="text-xs font-medium text-zinc-500 uppercase mb-1">Hook</p>
+                  <p className="text-sm text-zinc-700">{variant1.metadata.hook}</p>
                 </div>
               )}
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-zinc-900">
-                  Version A:
-                </h3>
-                <p className="text-sm text-zinc-600">{variant1.title}</p>
-              </div>
             </div>
-            <p className="text-sm leading-relaxed text-zinc-700">
-              {variant1.description}
-            </p>
+            <div className="mb-3">
+              <p className="text-xs font-medium text-zinc-500 uppercase mb-1">Content</p>
+              <p className="text-sm leading-relaxed text-zinc-700 whitespace-pre-wrap">
+                {variant1.content}
+              </p>
+            </div>
+            {variant1.metadata.hashtags && variant1.metadata.hashtags.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-medium text-zinc-500 uppercase mb-1">Hashtags</p>
+                <div className="flex flex-wrap gap-2">
+                  {variant1.metadata.hashtags.map((tag, idx) => (
+                    <span key={idx} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {variant1.metadata.reasoning && (
+              <div>
+                <p className="text-xs font-medium text-zinc-500 uppercase mb-1">Reasoning</p>
+                <p className="text-xs text-zinc-600 italic">{variant1.metadata.reasoning}</p>
+              </div>
+            )}
           </button>
 
           {/* Variant 2 */}
@@ -124,25 +144,41 @@ export default function NodeVariantModal({
             onClick={() => onSelectVariant?.(2)}
             className="group rounded-xl border-2 border-zinc-200 p-6 text-left transition-all hover:border-blue-400 hover:bg-blue-50/50"
           >
-            <div className="mb-4 flex items-start gap-3">
-              {variant2.icon && variant2.iconBg && (
-                <div
-                  className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: variant2.iconBg }}
-                >
-                  <span className="text-2xl">{variant2.icon}</span>
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-zinc-900 mb-2">
+                Version {variant2.variant_id}
+              </h3>
+              {variant2.metadata.hook && (
+                <div className="mb-3">
+                  <p className="text-xs font-medium text-zinc-500 uppercase mb-1">Hook</p>
+                  <p className="text-sm text-zinc-700">{variant2.metadata.hook}</p>
                 </div>
               )}
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-zinc-900">
-                  Version B:
-                </h3>
-                <p className="text-sm text-zinc-600">{variant2.title}</p>
-              </div>
             </div>
-            <p className="text-sm leading-relaxed text-zinc-700">
-              {variant2.description}
-            </p>
+            <div className="mb-3">
+              <p className="text-xs font-medium text-zinc-500 uppercase mb-1">Content</p>
+              <p className="text-sm leading-relaxed text-zinc-700 whitespace-pre-wrap">
+                {variant2.content}
+              </p>
+            </div>
+            {variant2.metadata.hashtags && variant2.metadata.hashtags.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-medium text-zinc-500 uppercase mb-1">Hashtags</p>
+                <div className="flex flex-wrap gap-2">
+                  {variant2.metadata.hashtags.map((tag, idx) => (
+                    <span key={idx} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {variant2.metadata.reasoning && (
+              <div>
+                <p className="text-xs font-medium text-zinc-500 uppercase mb-1">Reasoning</p>
+                <p className="text-xs text-zinc-600 italic">{variant2.metadata.reasoning}</p>
+              </div>
+            )}
           </button>
         </div>
       </div>

@@ -1,14 +1,25 @@
 from django.shortcuts import render
-import os
-import requests
+import os, requests, time
 from dotenv import load_dotenv
 from django.conf import settings
 from .models import PostMetrics
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .serializer import PostMetricsSerializer, PostSerializer
+from .serializer import PostMetricsSerializer, PostSerializer, ContentVariantSerializer
 from agents.models import Post, ContentVariant, Campaign
 from requests_oauthlib import OAuth1
+from time import time
+from django.core.cache import cache
+
+
+CACHE_TTL = 120
+def should_skip_fetch(tweet_id):
+    key = f"x:last-fetch:{tweet_id}"
+    last = cache.get(key)
+    if last and time() - last < CACHE_TTL:
+        return True
+    cache.set(key, time(), CACHE_TTL)
+    return False
 
 auth = OAuth1(
     settings.X_API_KEY,
@@ -16,6 +27,10 @@ auth = OAuth1(
     settings.X_ACCESS_TOKEN,
     settings.X_ACCESS_TOKEN_SECRET,
 )
+
+POLL_TIMEOUT_SEC = 30
+POLL_INTERVAL_SEC = 1.0
+GRAPH_VERSION = "v23.0"
 
 
 # Create your views here.
@@ -70,25 +85,27 @@ def getXPostMetrics(request):
     # Use clone API instead of real Twitter API
     url = f"http://localhost:8000/clone/2/tweets"
     headers = {
+        "Authorization": f"Bearer {settings.X_BEARER_TOKEN}",  # <- user-context token
         "Content-Type": "application/json",
     }
     params = {
         "ids": tweet_id,
-        "tweet.fields": "public_metrics,non_public_metrics"
+        "tweet.fields": "public_metrics"
     }
 
     resp = requests.get(url, headers=headers, params=params)
+
+    print("rate-limit-limit:", resp.headers.get("x-rate-limit-limit"))
+    print("rate-limit-remaining:", resp.headers.get("x-rate-limit-remaining"))
+    print("rate-limit-reset:", resp.headers.get("x-rate-limit-reset"))
     data = resp.json()
 
     if resp.status_code == 200:
         d = data["data"][0]
         pub = d.get("public_metrics", {})
-        nonpub = d.get("non_public_metrics", {})
-        PostMetrics.objects.filter(tweet_id=tweet_id).update(
-            likes=pub.get("like_count", 0),
-            retweets=pub.get("retweet_count", 0),
-            impressions=nonpub.get("impression_count", 0),
-        )
+        postMetrics.likes = pub.get("like_count", 0)
+        postMetrics.retweets = pub.get("retweet_count", 0)
+        postMetrics.save()
         return Response(data, status=200)
     return Response({"error": data}, status=resp.status_code)
 
@@ -97,6 +114,51 @@ def metricsJSON(request):
     qs = PostMetrics.objects.all()
     serializer = PostMetricsSerializer(qs, many=True)
     return Response(serializer.data)
+
+@api_view(['GET'])
+def getVariants(request):
+    """Get content variants for a post by pk"""
+    pk = request.GET.get("pk")
+    if not pk:
+        return Response({"error": "Missing 'pk' parameter"}, status=400)
+
+    try:
+        post = Post.objects.get(pk=pk)
+        variants = post.variants.all()  # Uses related_name='variants' from ContentVariant model
+        serializer = ContentVariantSerializer(variants, many=True)
+        return Response({"variants": serializer.data}, status=200)
+    except Post.DoesNotExist:
+        return Response({"error": f"Post with pk={pk} not found"}, status=404)
+
+@api_view(['POST'])
+def selectVariant(request):
+    """Save selected variant for a post"""
+    pk = request.data.get("pk")
+    variant_id = request.data.get("variant_id")
+
+    if not pk or not variant_id:
+        return Response({"error": "Missing 'pk' or 'variant_id' field"}, status=400)
+
+    try:
+        post = Post.objects.get(pk=pk)
+        # Verify the variant exists
+        variant = post.variants.filter(variant_id=variant_id).first()
+
+        if not variant:
+            return Response({"error": f"Variant '{variant_id}' not found for post {pk}"}, status=404)
+
+        # Save selected variant
+        post.selected_variant = variant_id
+        post.save()
+
+        return Response({
+            "success": True,
+            "message": f"Variant '{variant_id}' selected for post {pk}",
+            "post_id": post.pk,
+            "selected_variant": variant_id
+        }, status=200)
+    except Post.DoesNotExist:
+        return Response({"error": f"Post with pk={pk} not found"}, status=404)
 
 @api_view(['POST'])
 def approveNode(request):
@@ -147,3 +209,20 @@ def rejectNode(request):
         return Response({
             "error": f"Post with pk={pk} not found"
         }, status=404)
+
+
+
+
+########################################################################
+#                               INSTAGRAM
+#########################################################################
+def createIGPost(request):
+    pk = request.data.get("pk")
+    if not pk:
+        return Response({"error": "Missing 'pk' field"}, status=400)
+    
+    post = Post.objects.get(pk=pk)
+    variantId = post.selected_variant
+    selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=post)
+    text = selectedVariant.content
+
