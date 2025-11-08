@@ -26,34 +26,37 @@ def nodesJSON(request):
     serializer = PostSerializer(qs, many=True)
     return Response(serializer.data)
 
-@api_view(['GET'])
-def metricsJSON(request):
-    qs = PostMetrics.objects.all()
-    serializer = PostMetricsSerializer(qs, many=True)
-    return Response(serializer.data)
-
 @api_view(['POST'])
 def createXPost(request):
     pk = request.data.get("pk")
     if not pk:
         return Response({"error": "Missing 'pk' field"}, status=400)
     
-    variantId = Post.objects.get(pk=pk).selected_variant
-    selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=Post.objects.get(pk=pk))
+    post = Post.objects.get(pk=pk)
+    variantId = post.selected_variant
+    selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=post)
     text = selectedVariant.content
 
     url = "https://api.x.com/2/tweets"
     headers = {
-        "Authorization": f"Bearer {settings.X_ACCESS_TOKEN}",
+        # "Authorization": f"Bearer {settings.X_ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
     body = {"text": text}
 
     resp = requests.post(url, headers=headers, json=body, auth=auth)
+    data = resp.json()
+
     if resp.status_code == 201:
-        return Response(resp.json(), status=201)
-    else:
-        return Response({"error": resp.json()}, status=resp.status_code)
+        tweet_id = (data.get("data")).get("id")
+        if tweet_id:
+            postMetrics = post.metrics
+            postMetrics.tweet_id = tweet_id
+            post.status = "published"
+            postMetrics.save()
+            post.save()
+
+    return Response(resp.json(), status=resp.status_code)
     
 @api_view(['GET'])
 def getXPostMetrics(request, tweet_id):
@@ -72,6 +75,12 @@ def getXPostMetrics(request, tweet_id):
         return Response(resp.json(), status=200)
     else:
         return Response({"error": resp.json()}, status=resp.status_code)
+
+@api_view(['GET'])
+def metricsJSON(request):
+    qs = PostMetrics.objects.all()
+    serializer = PostMetricsSerializer(qs, many=True)
+    return Response(serializer.data)
 
 @api_view(['POST'])
 def approveNode(request):
