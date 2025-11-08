@@ -94,10 +94,6 @@ def getXPostMetrics(request):
     }
 
     resp = requests.get(url, headers=headers, params=params)
-
-    print("rate-limit-limit:", resp.headers.get("x-rate-limit-limit"))
-    print("rate-limit-remaining:", resp.headers.get("x-rate-limit-remaining"))
-    print("rate-limit-reset:", resp.headers.get("x-rate-limit-reset"))
     data = resp.json()
 
     if resp.status_code == 200:
