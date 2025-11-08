@@ -30,20 +30,20 @@ def createXPost(request):
     pk = request.data.get("pk")
     if not pk:
         return Response({"error": "Missing 'pk' field"}, status=400)
-    
+
     post = Post.objects.get(pk=pk)
     variantId = post.selected_variant
     selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=post)
     text = selectedVariant.content
 
-    url = "https://api.x.com/2/tweets"
+    # Use clone API instead of real Twitter API
+    url = f"http://localhost:8000/clone/2/tweets"
     headers = {
-        # "Authorization": f"Bearer {settings.X_ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
     body = {"text": text}
 
-    resp = requests.post(url, headers=headers, json=body, auth=auth)
+    resp = requests.post(url, headers=headers, json=body)
     data = resp.json()
 
     if resp.status_code == 201:
@@ -62,21 +62,21 @@ def getXPostMetrics(request):
     pk = request.data.get("pk")
     if not pk:
         return Response({"error": "Missing 'pk' field"}, status=400)
-    
+
     post = Post.objects.get(pk=pk)
     postMetrics = post.metrics
     tweet_id = postMetrics.tweet_id
 
-    url = f"https://api.x.com/2/tweets"
+    # Use clone API instead of real Twitter API
+    url = f"http://localhost:8000/clone/2/tweets"
     headers = {
-        "Authorization": f"Bearer {settings.X_USER_BEARER_TOKEN}",  # <- user-context token
         "Content-Type": "application/json",
     }
     params = {
         "ids": tweet_id,
         "tweet.fields": "public_metrics,non_public_metrics"
     }
-    
+
     resp = requests.get(url, headers=headers, params=params)
     data = resp.json()
 
