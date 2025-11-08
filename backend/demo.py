@@ -325,16 +325,17 @@ def run_sequential_demo():
 
     try:
         # Scenario 1: Strategy Planning
-        mermaid_diagram, campaign = scenario_1_strategy_planning(product_description, gtm_goals)
+        # mermaid_diagram, campaign = scenario_1_strategy_planning(product_description, gtm_goals)
 
-        input("\n⏸️  Press Enter to continue to Scenario 2...")
+        # input("\n⏸️  Press Enter to continue to Scenario 2...")
 
-        # Scenario 2: Generate A/B Content
-        scenario_2_generate_ab_content(campaign, product_description)
+        # # Scenario 2: Generate A/B Content
+        # scenario_2_generate_ab_content(campaign, product_description)
 
-        input("\n⏸️  Press Enter to continue to Scenario 3...")
+        # input("\n⏸️  Press Enter to continue to Scenario 3...")
 
         # Scenario 3: Metrics Analysis & Improvement
+        campaign:Campaign = Campaign.objects.first()  # For demo, get first campaign
         scenario_3_metrics_analysis_and_improvement(campaign, product_description)
 
         print_section("✅ SEQUENTIAL DEMO COMPLETE")

@@ -83,6 +83,7 @@ CRITICAL REQUIREMENTS - YOU MUST FOLLOW EXACTLY:
 
 5. LIMITS
 - Limit to 3 nodes per phase maximum
+- Node of same phase should not be connected to each other. Instead, connect to the following phases.
 
 EXAMPLE OUTPUT FORMAT:
 ```

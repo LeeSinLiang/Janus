@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 import os
 import json
 
+from debug import debug_print
+
 
 # =====================
 # Output Schema
@@ -50,7 +52,8 @@ class MetricsAnalyzerAgent:
 		# Initialize model using ChatGoogleGenerativeAI
 		self.model = ChatGoogleGenerativeAI(
 			model=model_name,
-			temperature=temperature
+			temperature=temperature,
+			thinking_budget=0
 		)
 
 		# Set up structured output parser
@@ -219,9 +222,8 @@ Provide a comprehensive analysis with insights and specific recommendations."""
 		result = self.agent.invoke({
 			"messages": [{"role": "user", "content": metrics_input}]
 		})
-
 		# Return as MetricsAnalysis object
-		return MetricsAnalysis(**result)
+		return MetricsAnalysis.model_validate(result['structured_response'])
 
 
 # =====================
