@@ -32,7 +32,7 @@ def getMetricsDB():
 def nodesJSON(request):
 	posts = Post.objects.filter(campaign=Campaign.objects.first())
 	serializer = PostSerializer(posts, many=True)
-	metricsData = getMetricsDB(posts_qs=posts)
+	metricsData = getMetricsDB()
 
 	return Response({
 		"diagram": serializer.data,
