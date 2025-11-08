@@ -1,10 +1,4 @@
 from django.shortcuts import render
-<<<<<<< HEAD
-from django.http import HttpResponse
-from django.template import loader
-=======
-from django.views.decorators.csrf import csrf_exempt
->>>>>>> 97ddd953283ae890f8cbe17553ee5a4c682f52af
 import os
 import requests
 from dotenv import load_dotenv
@@ -78,12 +72,6 @@ def getXPostMetrics(request, tweet_id):
         return Response(resp.json(), status=200)
     else:
         return Response({"error": resp.json()}, status=resp.status_code)
-<<<<<<< HEAD
-    
-
-    template = loader.get_template('createPost.html')
-    return HttpResponse(template.render())
-=======
 
 @api_view(['POST'])
 def approveNode(request):
@@ -133,4 +121,3 @@ def rejectNode(request):
         return Response({
             "error": f"Post with title '{node_name}' not found"
         }, status=404)
->>>>>>> 97ddd953283ae890f8cbe17553ee5a4c682f52af
