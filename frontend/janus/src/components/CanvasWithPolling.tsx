@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -17,6 +17,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import TaskCardNode from './TaskCardNode';
 import ChatBox from './ChatBox';
+import ViewToggle from './ViewToggle';
 import { useGraphData } from '@/hooks/useGraphData';
 
 const nodeTypes = {
@@ -24,6 +25,9 @@ const nodeTypes = {
 };
 
 export default function CanvasWithPolling() {
+  // View state
+  const [activeView, setActiveView] = useState<'node-editor' | 'chart'>('node-editor');
+
   // Fetch graph data with automatic polling and diff-based updates
   // The hook now handles all diffing internally and preserves positions
   const { nodes, edges, loading, error, setNodes, setEdges } = useGraphData({
@@ -124,27 +128,60 @@ export default function CanvasWithPolling() {
 
   return (
     <div className="relative h-full w-full bg-gray-50">
-      {/* ReactFlow Canvas */}
-      <ReactFlow
-        nodes={nodesWithHandlers}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-      >
-        <Controls />
-        <Background color="#e5e7eb" variant={BackgroundVariant.Dots} gap={16} size={4} />
-      </ReactFlow>
-
-      {/* Floating ChatBox at the bottom */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
-        <div className="pointer-events-auto w-full max-w-[50%] rounded-xl border border-zinc-200 bg-white shadow-lg">
-          <ChatBox nodes={nodesWithHandlers} />
-        </div>
+      {/* View Toggle - positioned at top left */}
+      <div className="absolute left-8 top-8 z-10">
+        <ViewToggle activeView={activeView} onViewChange={setActiveView} />
       </div>
+
+      {/* Conditional view rendering */}
+      {activeView === 'node-editor' ? (
+        <>
+          {/* ReactFlow Canvas */}
+          <ReactFlow
+            nodes={nodesWithHandlers}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+          >
+            <Controls />
+            <Background color="#e5e7eb" variant={BackgroundVariant.Dots} gap={16} size={4} />
+          </ReactFlow>
+
+          {/* Floating ChatBox at the bottom */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
+            <div className="pointer-events-auto w-full max-w-[50%] rounded-xl border border-zinc-200 bg-white shadow-lg">
+              <ChatBox nodes={nodesWithHandlers} />
+            </div>
+          </div>
+        </>
+      ) : (
+        /* Chart View Placeholder */
+        <div className="flex h-full w-full items-center justify-center">
+          <div className="text-center">
+            <svg
+              width="80"
+              height="80"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="mx-auto mb-4 text-gray-300"
+            >
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
+            <h2 className="text-xl font-semibold text-gray-700">Chart View</h2>
+            <p className="mt-2 text-gray-500">Coming soon...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
