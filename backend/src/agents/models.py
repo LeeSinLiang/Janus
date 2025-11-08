@@ -108,7 +108,6 @@ class Post(models.Model):
 	def save(self, *args, **kwargs):
 		if not self.metrics:
 			metrics = PostMetrics.objects.create(
-				post=self,
 				likes=0,
 				impressions=0,
 				retweets=0,
