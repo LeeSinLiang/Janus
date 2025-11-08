@@ -81,6 +81,9 @@ CRITICAL REQUIREMENTS - YOU MUST FOLLOW EXACTLY:
    - Show logical flow from Phase 1 → Phase 2 → Phase 3
    - Use format: NODE1 --> NODE2
 
+5. LIMITS
+- Limit to 3 nodes per phase maximum
+
 EXAMPLE OUTPUT FORMAT:
 ```
 graph TB

@@ -5,8 +5,8 @@ Analyzes engagement metrics from X API, provides insights, and recommends optimi
 
 from typing import Dict, Any, Optional
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.agents import create_agent
 from pydantic import BaseModel, Field
 import os
 import json
@@ -17,8 +17,8 @@ import json
 # =====================
 
 class MetricsAnalysis(BaseModel):
-    """Schema for metrics analysis output"""
-    analyzed_report: str = Field(description="Detailed analysis report with insights and recommendations")
+	"""Schema for metrics analysis output"""
+	analyzed_report: str = Field(description="Detailed analysis report with insights and recommendations")
 
 
 # =====================
@@ -26,48 +26,52 @@ class MetricsAnalysis(BaseModel):
 # =====================
 
 class MetricsAnalyzerAgent:
-    """
-    Agent specialized in analyzing X (Twitter) API metrics and providing insights.
-    Focuses on engagement rates, sentiment analysis, and content performance.
-    """
+	"""
+	Agent specialized in analyzing X (Twitter) API metrics and providing insights.
+	Focuses on engagement rates, sentiment analysis, and content performance.
+	"""
 
-    def __init__(
-        self,
-        model_name: Optional[str] = None,
-        temperature: float = 0.0
-    ):
-        """
-        Initialize the Metrics Analyzer Agent.
+	def __init__(
+		self,
+		model_name: Optional[str] = None,
+		temperature: float = 0.0
+	):
+		"""
+		Initialize the Metrics Analyzer Agent.
 
-        Args:
-            model_name: Google Gemini model name (defaults to GEMINI_MODEL_CODE env var)
-            temperature: Temperature for analysis (default: 0.0 for consistent analysis)
-        """
-        # Get model from environment or use provided
-        if model_name is None:
-            model_name = os.getenv("GEMINI_MODEL_CODE", "gemini-2.5-flash")
+		Args:
+			model_name: Google Gemini model name (defaults to GEMINI_MODEL_CODE env var)
+			temperature: Temperature for analysis (default: 0.0 for consistent analysis)
+		"""
+		# Get model from environment or use provided
+		if model_name is None:
+			model_name = os.getenv("GEMINI_MODEL_CODE", "gemini-2.5-flash")
 
-        # Initialize model using ChatGoogleGenerativeAI
-        self.model = ChatGoogleGenerativeAI(
-            model=model_name,
-            temperature=temperature
-        )
+		# Initialize model using ChatGoogleGenerativeAI
+		self.model = ChatGoogleGenerativeAI(
+			model=model_name,
+			temperature=temperature
+		)
 
-        # Set up structured output parser
-        self.parser = JsonOutputParser(pydantic_object=MetricsAnalysis)
+		# Set up structured output parser
 
-        # Create the prompt template
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", self._get_system_prompt()),
-            ("user", "{metrics_input}")
-        ])
+		# Create the prompt template
+		self.prompt = ChatPromptTemplate.from_messages([
+			("system", self._get_system_prompt()),
+			("user", "{metrics_input}")
+		])
 
-        # Create the chain
-        self.chain = self.prompt | self.model | self.parser
+		self.agent = create_agent(
+			self.model,
+			tools=[],  # No external tools needed
+			system_prompt=self._get_system_prompt(),
+			response_format=MetricsAnalysis
+		)
 
-    def _get_system_prompt(self) -> str:
-        """Get the system prompt for metrics analysis"""
-        return """You are an expert marketing analytics specialist focused on X (Twitter) API metrics analysis.
+
+	def _get_system_prompt(self) -> str:
+		"""Get the system prompt for metrics analysis"""
+		return """You are an expert marketing analytics specialist focused on X (Twitter) API metrics analysis.
 
 Your task is to analyze engagement metrics from X API responses (JSON format) and provide actionable insights.
 
@@ -168,42 +172,42 @@ Return a JSON object with this exact structure:
 
 IMPORTANT: Be thorough but concise. Focus on actionable insights over generic observations."""
 
-    def execute(self, metrics_data: Dict[str, Any]) -> MetricsAnalysis:
-        """
-        Analyze metrics data from X API and generate insights.
+	def execute(self, metrics_data: Dict[str, Any]) -> MetricsAnalysis:
+		"""
+		Analyze metrics data from X API and generate insights.
 
-        Args:
-            metrics_data: Dictionary containing X API metrics in standard format.
-                         Can be a single post or multiple posts for A/B comparison.
-                         Expected format follows X API v2 response structure with
-                         engagement metrics (views, likes, retweets, replies, etc.)
+		Args:
+			metrics_data: Dictionary containing X API metrics in standard format.
+						 Can be a single post or multiple posts for A/B comparison.
+						 Expected format follows X API v2 response structure with
+						 engagement metrics (views, likes, retweets, replies, etc.)
 
-        Returns:
-            MetricsAnalysis object with analyzed_report containing detailed
-            insights, recommendations, and A/B comparison (if applicable)
+		Returns:
+			MetricsAnalysis object with analyzed_report containing detailed
+			insights, recommendations, and A/B comparison (if applicable)
 
-        Example metrics_data format:
-            {
-                "posts": [
-                    {
-                        "id": "123...",
-                        "text": "Tweet content...",
-                        "metrics": {
-                            "views": 10000,
-                            "likes": 250,
-                            "retweets": 45,
-                            "replies": 12
-                        },
-                        "variant": "A"  # optional for A/B testing
-                    }
-                ]
-            }
-        """
-        # Convert metrics_data to formatted JSON string for the prompt
-        metrics_json = json.dumps(metrics_data, indent=2)
+		Example metrics_data format:
+			{
+				"posts": [
+					{
+						"id": "123...",
+						"text": "Tweet content...",
+						"metrics": {
+							"views": 10000,
+							"likes": 250,
+							"retweets": 45,
+							"replies": 12
+						},
+						"variant": "A"  # optional for A/B testing
+					}
+				]
+			}
+		"""
+		# Convert metrics_data to formatted JSON string for the prompt
+		metrics_json = json.dumps(metrics_data, indent=2)
 
-        # Build the input
-        metrics_input = f"""Analyze the following X API metrics data:
+		# Build the input
+		metrics_input = f"""Analyze the following X API metrics data:
 
 ```json
 {metrics_json}
@@ -211,11 +215,13 @@ IMPORTANT: Be thorough but concise. Focus on actionable insights over generic ob
 
 Provide a comprehensive analysis with insights and specific recommendations."""
 
-        # Generate analysis
-        result = self.chain.invoke({"metrics_input": metrics_input})
+		# Generate analysis
+		result = self.agent.invoke({
+			"messages": [{"role": "user", "content": metrics_input}]
+		})
 
-        # Return as MetricsAnalysis object
-        return MetricsAnalysis(**result)
+		# Return as MetricsAnalysis object
+		return MetricsAnalysis(**result)
 
 
 # =====================
@@ -223,20 +229,20 @@ Provide a comprehensive analysis with insights and specific recommendations."""
 # =====================
 
 def create_metrics_analyzer(
-    model_name: Optional[str] = None,
-    temperature: float = 0.0
+	model_name: Optional[str] = None,
+	temperature: float = 0.0
 ) -> MetricsAnalyzerAgent:
-    """
-    Factory function to create a Metrics Analyzer Agent.
+	"""
+	Factory function to create a Metrics Analyzer Agent.
 
-    Args:
-        model_name: Google Gemini model name (defaults to GEMINI_MODEL_CODE env var)
-        temperature: Temperature for analysis (default: 0.0)
+	Args:
+		model_name: Google Gemini model name (defaults to GEMINI_MODEL_CODE env var)
+		temperature: Temperature for analysis (default: 0.0)
 
-    Returns:
-        Initialized MetricsAnalyzerAgent
-    """
-    return MetricsAnalyzerAgent(model_name=model_name, temperature=temperature)
+	Returns:
+		Initialized MetricsAnalyzerAgent
+	"""
+	return MetricsAnalyzerAgent(model_name=model_name, temperature=temperature)
 
 
 # =====================
@@ -244,56 +250,56 @@ def create_metrics_analyzer(
 # =====================
 
 if __name__ == "__main__":
-    # Example: Analyze metrics from X API
-    agent = create_metrics_analyzer()
+	# Example: Analyze metrics from X API
+	agent = create_metrics_analyzer()
 
-    # Sample metrics data (X API format)
-    sample_metrics = {
-        "posts": [
-            {
-                "id": "1234567890",
-                "text": "Just shipped our new AI-powered marketing automation tool for technical founders! 🚀\n\nAutomates strategy, content creation, and A/B testing across social platforms.\n\n#SaaS #AI #Marketing",
-                "created_at": "2025-11-08T10:00:00Z",
-                "variant": "A",
-                "metrics": {
-                    "views": 15000,
-                    "likes": 450,
-                    "retweets": 78,
-                    "replies": 23,
-                    "quotes": 12,
-                    "bookmarks": 89
-                },
-                "author": {
-                    "username": "techfounder",
-                    "followers": 5200
-                }
-            },
-            {
-                "id": "1234567891",
-                "text": "We built an AI GTM OS that does your marketing strategy, content creation, and optimization automatically.\n\nTechnical founders: stop doing marketing manually.\n\n#AI #MarketingAutomation",
-                "created_at": "2025-11-08T10:00:00Z",
-                "variant": "B",
-                "metrics": {
-                    "views": 15200,
-                    "likes": 380,
-                    "retweets": 65,
-                    "replies": 18,
-                    "quotes": 8,
-                    "bookmarks": 72
-                },
-                "author": {
-                    "username": "techfounder",
-                    "followers": 5200
-                }
-            }
-        ]
-    }
+	# Sample metrics data (X API format)
+	sample_metrics = {
+		"posts": [
+			{
+				"id": "1234567890",
+				"text": "Just shipped our new AI-powered marketing automation tool for technical founders! 🚀\n\nAutomates strategy, content creation, and A/B testing across social platforms.\n\n#SaaS #AI #Marketing",
+				"created_at": "2025-11-08T10:00:00Z",
+				"variant": "A",
+				"metrics": {
+					"views": 15000,
+					"likes": 450,
+					"retweets": 78,
+					"replies": 23,
+					"quotes": 12,
+					"bookmarks": 89
+				},
+				"author": {
+					"username": "techfounder",
+					"followers": 5200
+				}
+			},
+			{
+				"id": "1234567891",
+				"text": "We built an AI GTM OS that does your marketing strategy, content creation, and optimization automatically.\n\nTechnical founders: stop doing marketing manually.\n\n#AI #MarketingAutomation",
+				"created_at": "2025-11-08T10:00:00Z",
+				"variant": "B",
+				"metrics": {
+					"views": 15200,
+					"likes": 380,
+					"retweets": 65,
+					"replies": 18,
+					"quotes": 8,
+					"bookmarks": 72
+				},
+				"author": {
+					"username": "techfounder",
+					"followers": 5200
+				}
+			}
+		]
+	}
 
-    # Analyze metrics
-    result = agent.execute(sample_metrics)
+	# Analyze metrics
+	result = agent.execute(sample_metrics)
 
-    print("=" * 80)
-    print("METRICS ANALYSIS REPORT")
-    print("=" * 80)
-    print(result.analyzed_report)
-    print("=" * 80)
+	print("=" * 80)
+	print("METRICS ANALYSIS REPORT")
+	print("=" * 80)
+	print(result.analyzed_report)
+	print("=" * 80)
