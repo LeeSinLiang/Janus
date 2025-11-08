@@ -2,5 +2,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('nodeMetricsDisplay', views.nodeMetricsDisplay, name='nodeMetricsDisplay'),
+    # path('metricsDisplay/', views.metricsDisplay, name='metricsDisplay'),
+    path('metricsJson/', views.metricsJSON, name='metricsJSON'),
 ]
