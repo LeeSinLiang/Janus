@@ -67,15 +67,10 @@ export default function CanvasWithPolling() {
   // Approve a pending node
   const handleApproveNode = useCallback(
     async (nodeId: string) => {
-      // Find the node to get its name
-      const node = nodes.find(n => n.id === nodeId);
-      if (!node) return;
-
-      const nodeName = String(node.data?.title || nodeId);
-
+      // nodeId is the pk from the backend
       try {
         // Send approval to backend
-        await approveNode(nodeName);
+        await approveNode(nodeId);
 
         // Update UI - remove pending state
         setNodes((nds) =>
@@ -119,8 +114,8 @@ export default function CanvasWithPolling() {
       if (!rejectionState) return;
 
       try {
-        // Send rejection to backend
-        await rejectNode(rejectionState.nodeName, rejectMessage);
+        // Send rejection to backend (nodeId is the pk)
+        await rejectNode(rejectionState.nodeId, rejectMessage);
 
         // Remove the node from UI
         setNodes((nds) => nds.filter((node) => node.id !== rejectionState.nodeId));

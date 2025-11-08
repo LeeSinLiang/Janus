@@ -177,9 +177,16 @@ export function applyGraphDiff(
 /**
  * Position new nodes intelligently based on existing nodes
  * Also marks them as pending approval
- * Uses phase-aware positioning to maintain layout structure
+ * Uses strict phase-based column positioning to maintain layout structure
  */
 function positionNewNodes(existingNodes: Node[], newNodes: Node[]): Node[] {
+  // Define strict X positions matching dagreLayout.ts
+  const PHASE_X_POSITIONS = {
+    'Phase 1': 50,    // Left column (200 - 150 for centering)
+    'Phase 2': 600,   // Middle column (750 - 150 for centering)
+    'Phase 3': 1150,  // Right column (1300 - 150 for centering)
+  };
+
   if (existingNodes.length === 0) {
     // No existing nodes, use positions from parser (dagre layout) and mark as pending
     return newNodes.map(node => ({
@@ -206,15 +213,17 @@ function positionNewNodes(existingNodes: Node[], newNodes: Node[]): Node[] {
     const phase = String(node.data?.phase || 'Phase 1');
     const nodesInSamePhase = nodesByPhase.get(phase) || [];
 
+    // Get strict X position for this phase
+    const phaseX = PHASE_X_POSITIONS[phase as keyof typeof PHASE_X_POSITIONS] || PHASE_X_POSITIONS['Phase 1'];
+
     if (nodesInSamePhase.length > 0) {
-      // Position below other nodes in the same phase
-      const avgX = nodesInSamePhase.reduce((sum, n) => sum + n.position.x, 0) / nodesInSamePhase.length;
+      // Position below other nodes in the same phase column
       const maxY = Math.max(...nodesInSamePhase.map(n => n.position.y));
 
       return {
         ...node,
         position: {
-          x: avgX,
+          x: phaseX, // Strict phase column position
           y: maxY + 300, // Below existing nodes in same phase
         },
         data: {

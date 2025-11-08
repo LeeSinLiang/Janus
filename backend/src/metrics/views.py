@@ -1,4 +1,6 @@
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+from agents.models import Campaign
 import os
 import requests
 from dotenv import load_dotenv
@@ -22,7 +24,7 @@ auth = OAuth1(
 # Create your views here.
 @api_view(['GET'])
 def nodesJSON(request):
-    qs = Post.objects.all()
+    qs = Post.objects.filter(campaign=Campaign.objects.first())
     serializer = PostSerializer(qs, many=True)
     return Response(serializer.data)
 
@@ -74,50 +76,53 @@ def getXPostMetrics(request, tweet_id):
         return Response({"error": resp.json()}, status=resp.status_code)
 
 @api_view(['POST'])
+@csrf_exempt
 def approveNode(request):
     """Approve a pending node"""
-    node_name = request.data.get("node_name")
-    if not node_name:
-        return Response({"error": "Missing 'node_name' field"}, status=400)
+    pk = request.data.get("pk")
+    if not pk:
+        return Response({"error": "Missing 'pk' field"}, status=400)
 
-    # Find the post by title
+    # Find the post by pk
     try:
-        post = Post.objects.get(title=node_name)
+        post = Post.objects.get(pk=pk)
         # Mark as approved (you can add an 'approved' field to the model later)
         # For now, just return success
         return Response({
             "success": True,
-            "message": f"Node '{node_name}' approved",
+            "message": f"Node '{post.title}' (pk={post.pk}) approved",
             "post_id": post.pk
         }, status=200)
     except Post.DoesNotExist:
         return Response({
-            "error": f"Post with title '{node_name}' not found"
+            "error": f"Post with pk={pk} not found"
         }, status=404)
 
 @api_view(['POST'])
+@csrf_exempt
 def rejectNode(request):
     """Reject a pending node and remove it"""
-    node_name = request.data.get("node_name")
+    pk = request.data.get("pk")
     reject_message = request.data.get("reject_message", "")
 
-    if not node_name:
-        return Response({"error": "Missing 'node_name' field"}, status=400)
+    if not pk:
+        return Response({"error": "Missing 'pk' field"}, status=400)
 
-    # Find the post by title
+    # Find the post by pk
     try:
-        post = Post.objects.get(title=node_name)
+        post = Post.objects.get(pk=pk)
         post_id = post.pk
+        post_title = post.title
         # Delete the post
         post.delete()
 
         return Response({
             "success": True,
-            "message": f"Node '{node_name}' rejected and removed",
+            "message": f"Node '{post_title}' (pk={post_id}) rejected and removed",
             "reject_message": reject_message,
             "post_id": post_id
         }, status=200)
     except Post.DoesNotExist:
         return Response({
-            "error": f"Post with title '{node_name}' not found"
+            "error": f"Post with pk={pk} not found"
         }, status=404)
