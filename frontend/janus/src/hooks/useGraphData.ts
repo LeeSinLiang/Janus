@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import { fetchGraphData, fetchGraphDataMock } from '@/services/api';
-import { parseMermaidGraph } from '@/utils/mermaidParser';
+import { parseGraphData } from '@/utils/graphParser';
 import { diffGraphData, applyGraphDiff } from '@/utils/graphDiff';
 
 interface UseGraphDataOptions {
@@ -54,8 +54,8 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
       const shouldProcess = isInitialLoadRef.current || data.changes;
 
       if (shouldProcess) {
-        // Parse mermaid diagram with metrics
-        const { nodes: newNodes, edges: newEdges } = parseMermaidGraph(
+        // Parse JSON diagram with metrics
+        const { nodes: newNodes, edges: newEdges } = parseGraphData(
           data.diagram,
           data.metrics
         );

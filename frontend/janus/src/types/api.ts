@@ -2,15 +2,22 @@
  * API Response Types for Backend Integration
  */
 
+export interface DiagramNode {
+  pk: number;
+  title: string;
+  description: string;
+  next_post: number[];
+}
+
 export interface NodeMetrics {
-  node_id: string;
+  pk: string;
   likes: number;
   impressions: number;
   retweets: number;
 }
 
 export interface GraphResponse {
-  diagram: string;
+  diagram: DiagramNode[];
   metrics: NodeMetrics[];
   changes: boolean;
 }

@@ -1,0 +1,136 @@
+import { Node, Edge, MarkerType } from '@xyflow/react';
+import { DiagramNode, NodeMetrics } from '@/types/api';
+
+interface ParseResult {
+  nodes: Node[];
+  edges: Edge[];
+}
+
+// Available attribute tags
+const ATTRIBUTES = {
+  PLANNED: { label: 'Planned', color: '#FCD34D' },
+  FEATURE: { label: 'Feature', color: '#9333EA' },
+  FINISHED: { label: 'Finished', color: '#10B981' },
+  PROMO: { label: 'Promo', color: '#3B82F6' },
+};
+
+// Default icons and colors for nodes
+const DEFAULT_ICONS = ['📷', '▶️', '📝', '🎬', '📱', '💻', '🎨', '📊'];
+const DEFAULT_COLORS = ['#E4405F', '#FF0000', '#000000', '#3B82F6', '#10B981', '#9333EA'];
+
+/**
+ * Parse JSON diagram data and convert to ReactFlow nodes and edges
+ * @param diagramNodes - Array of diagram nodes from backend
+ * @param metrics - Optional array of metrics to apply to nodes
+ */
+export function parseGraphData(
+  diagramNodes: DiagramNode[],
+  metrics?: NodeMetrics[]
+): ParseResult {
+  // Create a map for quick metrics lookup
+  const metricsMap = new Map<number, NodeMetrics>();
+  if (metrics) {
+    metrics.forEach(metric => {
+      metricsMap.set(Number(metric.pk), metric);
+    });
+  }
+
+  // Convert diagram nodes to ReactFlow nodes
+  const reactFlowNodes = convertNodesToReactFlow(diagramNodes, metricsMap);
+
+  // Convert next_post relationships to edges
+  const reactFlowEdges = convertEdgesToReactFlow(diagramNodes);
+
+  return {
+    nodes: reactFlowNodes,
+    edges: reactFlowEdges,
+  };
+}
+
+/**
+ * Convert diagram nodes to ReactFlow node format with automatic positioning
+ */
+function convertNodesToReactFlow(
+  diagramNodes: DiagramNode[],
+  metricsMap: Map<number, NodeMetrics>
+): Node[] {
+  const nodes: Node[] = [];
+
+  // Layout configuration
+  const HORIZONTAL_SPACING = 400;
+  const VERTICAL_SPACING = 300;
+  const NODES_PER_ROW = 3;
+
+  diagramNodes.forEach((diagramNode, index) => {
+    const row = Math.floor(index / NODES_PER_ROW);
+    const col = index % NODES_PER_ROW;
+    const x = 50 + (col * HORIZONTAL_SPACING);
+    const y = 50 + (row * VERTICAL_SPACING);
+
+    nodes.push(createReactFlowNode(diagramNode, x, y, index, metricsMap));
+  });
+
+  return nodes;
+}
+
+/**
+ * Create a single ReactFlow node from diagram node data
+ */
+function createReactFlowNode(
+  diagramNode: DiagramNode,
+  x: number,
+  y: number,
+  index: number,
+  metricsMap: Map<number, NodeMetrics>
+): Node {
+  // Assign icon and color based on index (cycling through available options)
+  const icon = DEFAULT_ICONS[index % DEFAULT_ICONS.length];
+  const iconBg = DEFAULT_COLORS[index % DEFAULT_COLORS.length];
+
+  // Default tags (can be extended based on node attributes in the future)
+  const tags = [ATTRIBUTES.FEATURE, ATTRIBUTES.PLANNED];
+
+  // Get metrics for this node if available
+  const metrics = metricsMap.get(diagramNode.pk);
+  const likes = metrics?.likes ?? 1;
+  const comments = metrics?.retweets ?? 0; // Using retweets as comments
+
+  return {
+    id: String(diagramNode.pk),
+    type: 'taskCard',
+    position: { x, y },
+    data: {
+      icon,
+      iconBg,
+      title: diagramNode.title,
+      description: diagramNode.description,
+      likes,
+      comments,
+      tags,
+    },
+  };
+}
+
+/**
+ * Convert next_post relationships to ReactFlow edge format
+ */
+function convertEdgesToReactFlow(diagramNodes: DiagramNode[]): Edge[] {
+  const edges: Edge[] = [];
+  let edgeIndex = 0;
+
+  diagramNodes.forEach((node) => {
+    // Create an edge for each connection in next_post
+    node.next_post.forEach((targetPk) => {
+      edges.push({
+        id: `e${edgeIndex++}`,
+        source: String(node.pk),
+        target: String(targetPk),
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#94A3B8' },
+        type: 'default',
+        style: { stroke: '#94A3B8', strokeWidth: 2 },
+      });
+    });
+  });
+
+  return edges;
+}
