@@ -50,7 +50,7 @@ class CampaignAdmin(admin.ModelAdmin):
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
     """Admin interface for Post model"""
-    list_display = ('title', 'description', 'post_id', 'campaign', 'phase', 'status', 'selected_variant', 'created_at')
+    list_display = ('pk', 'title', 'description', 'post_id', 'campaign', 'phase', 'status', 'selected_variant', 'created_at')
     list_filter = ('status', 'phase', 'created_at')
     search_fields = ('post_id', 'campaign__name', 'campaign__campaign_id')
     readonly_fields = ('created_at', 'updated_at')

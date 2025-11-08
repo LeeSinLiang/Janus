@@ -7,24 +7,60 @@
 </head>
 <body>
     <button id="postButton">POST to X</button>
+    <!-- <script>
+        async function createXPost() {
+            const pk = 2;
+
+            const response = await fetch("/createXPost/", {   // <-- change URL to match your Django route
+                method: "POST",
+                headers: {
+                "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ pk: pk })
+            });
+
+            const data = await response.json();
+            console.log("Response from backend:", data);
+            alert(JSON.stringify(data));
+        }
+
+        document.getElementById("postButton").addEventListener("click", createXPost);
+    </script> -->
 
     <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrftoken = getCookie('csrftoken');
+
         async function createXPost() {
-        const pk = 1;
+            const pk = 2;
 
-        const response = await fetch("/api/create-x-post/", {   // <-- change URL to match your Django route
-            method: "POST",
-            headers: {
-            "Content-Type": "application/json",
-            // If you're using Django templates + CSRF, uncomment the next line and define getCookie
-            // "X-CSRFToken": getCookie("csrftoken"),
-            },
-            body: JSON.stringify({ text: text })
-        });
+            const response = await fetch("/createXPost/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrftoken   // include CSRF token header
+                },
+                body: JSON.stringify({ pk: pk }),
+                credentials: 'same-origin'
+            });
 
-        const data = await response.json();
-        console.log("Response from backend:", data);
-        alert(JSON.stringify(data));
+            const data = await response.json();
+            console.log("Response from backend:", data);
+            alert(JSON.stringify(data));
         }
 
         document.getElementById("postButton").addEventListener("click", createXPost);
