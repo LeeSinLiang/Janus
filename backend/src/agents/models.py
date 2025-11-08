@@ -102,7 +102,7 @@ class Post(models.Model):
 		]
 
 	def __str__(self):
-		return f"Post {self.post_id} - {self.campaign.name}"
+		return f"Post {self.title} - {self.campaign.name}"
 
 	# create metrics object when create new post
 	def save(self, *args, **kwargs):
