@@ -11,8 +11,8 @@ from agents.models import Post, ContentVariant
 from requests_oauthlib import OAuth1
 
 auth = OAuth1(
-    settings.X_CONSUMER_KEY,
-    settings.X_CONSUMER_SECRET,
+    settings.X_API_KEY,
+    settings.X_API_SECRET,
     settings.X_ACCESS_TOKEN,
     settings.X_ACCESS_TOKEN_SECRET,
 )
@@ -49,7 +49,7 @@ def createXPost(request):
     }
     body = {"text": text}
 
-    resp = requests.post(url, headers=headers, json=body)
+    resp = requests.post(url, headers=headers, json=body, auth=auth)
     if resp.status_code == 201:
         return Response(resp.json(), status=201)
     else:
