@@ -67,9 +67,9 @@ export function applyDagreLayout(
     phaseGraph.setDefaultEdgeLabel(() => ({}));
 
     phaseGraph.setGraph({
-      rankdir: 'TB', // Top-to-Bottom within each phase column
-      nodesep: opts.verticalSpacing,
-      ranksep: 80, // Tighter vertical spacing within phase
+      rankdir: 'LR', // Left-to-Right for better horizontal distribution
+      nodesep: opts.horizontalSpacing / 2, // Horizontal spacing between nodes
+      ranksep: opts.verticalSpacing, // Vertical spacing between ranks
     });
 
     // Add nodes from this phase
@@ -92,14 +92,22 @@ export function applyDagreLayout(
     // Run dagre layout for this phase
     dagre.layout(phaseGraph);
 
-    // Apply positions with strict X coordinate
+    // Calculate the centroid X position of all nodes in this phase
+    // This helps us center the phase layout around the target X position
+    const phaseNodePositions = phaseNodes.map(node => phaseGraph.node(node.id));
+    const avgX = phaseNodePositions.reduce((sum, pos) => sum + pos.x, 0) / phaseNodePositions.length;
+    const targetPhaseX = PHASE_X_POSITIONS[phaseNumber as keyof typeof PHASE_X_POSITIONS];
+    const xOffset = targetPhaseX - avgX;
+
+    // Apply positions - center phase layout around phase column position
     phaseNodes.forEach(node => {
       const nodeWithPosition = phaseGraph.node(node.id);
 
       layoutedNodes.push({
         ...node,
         position: {
-          x: PHASE_X_POSITIONS[phaseNumber as keyof typeof PHASE_X_POSITIONS] - opts.nodeWidth / 2,
+          // Center the dagre layout around the phase column X position
+          x: nodeWithPosition.x + xOffset - opts.nodeWidth / 2,
           y: nodeWithPosition.y - opts.nodeHeight / 2,
         },
       });

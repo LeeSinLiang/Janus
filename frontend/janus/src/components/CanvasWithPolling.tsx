@@ -25,7 +25,7 @@ import WelcomeBar from './WelcomeBar';
 import EngagementLineChart from './EngagementLineChart';
 import EngagementPieChart from './EngagementPieChart';
 import { useGraphData } from '@/hooks/useGraphData';
-import { approveNode, rejectNode, fetchVariants, selectVariant } from '@/services/api';
+import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost } from '@/services/api';
 import { Node as FlowNode } from '@xyflow/react';
 
 const nodeTypes = {
@@ -51,6 +51,9 @@ export default function CanvasWithPolling() {
   // Phase state
   const [activePhase, setActivePhase] = useState(1); // 0-indexed, so 1 = Phase 2
 
+  // Success message state
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   // Phase data
   const phases = [
     { name: 'Phase 1', dateRange: '(11 / 01 - 11 / 07)', isActive: activePhase === 0 },
@@ -70,10 +73,13 @@ export default function CanvasWithPolling() {
     async (nodeId: string) => {
       // nodeId is the pk from the backend
       try {
-        // Send approval to backend
-        await approveNode(nodeId);
+        // Call both APIs in parallel
+        await Promise.all([
+          approveNode(nodeId),
+          createXPost(nodeId)
+        ]);
 
-        // Update UI - remove pending state
+        // Update UI - remove pending state and change status to published
         setNodes((nds) =>
           nds.map((node) =>
             node.id === nodeId
@@ -82,11 +88,22 @@ export default function CanvasWithPolling() {
                   data: {
                     ...node.data,
                     pendingApproval: false,
+                    tags: Array.isArray(node.data.tags)
+                      ? node.data.tags.map((tag: any) =>
+                          tag.label === 'Planned'
+                            ? { label: 'Published', color: '#10B981' }
+                            : tag
+                        )
+                      : [],
                   },
                 }
               : node
           )
         );
+
+        // Show success message
+        setSuccessMessage('Node approved and posted to X!');
+        setTimeout(() => setSuccessMessage(null), 3000);
       } catch (error) {
         console.error('Failed to approve node:', error);
         // Optionally show error to user
@@ -270,6 +287,18 @@ export default function CanvasWithPolling() {
 
   return (
     <div className="relative h-full w-full bg-gray-50">
+      {/* Success Message Toast */}
+      {successMessage && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="font-medium">{successMessage}</span>
+          </div>
+        </div>
+      )}
+
       {/* Node Variant Modal */}
       {selectedNode && variants && variants.length >= 2 && (
         <NodeVariantModal
