@@ -1,5 +1,6 @@
 import { Node, Edge, MarkerType } from '@xyflow/react';
 import { DiagramNode, NodeMetrics } from '@/types/api';
+import { applyDagreLayout } from './dagreLayout';
 
 interface ParseResult {
   nodes: Node[];
@@ -20,8 +21,11 @@ const DEFAULT_COLORS = ['#E4405F', '#FF0000', '#000000', '#3B82F6', '#10B981', '
 
 /**
  * Parse JSON diagram data and convert to ReactFlow nodes and edges
+ * Applies automatic dagre layout for phase-aware hierarchical positioning
+ *
  * @param diagramNodes - Array of diagram nodes from backend
  * @param metrics - Optional array of metrics to apply to nodes
+ * @returns Positioned nodes and edges ready for ReactFlow
  */
 export function parseGraphData(
   diagramNodes: DiagramNode[],
@@ -35,14 +39,18 @@ export function parseGraphData(
     });
   }
 
-  // Convert diagram nodes to ReactFlow nodes
+  // Convert diagram nodes to ReactFlow nodes (with temporary positions)
   const reactFlowNodes = convertNodesToReactFlow(diagramNodes, metricsMap);
 
-  // Convert next_post relationships to edges
+  // Convert next_posts relationships to edges
   const reactFlowEdges = convertEdgesToReactFlow(diagramNodes);
 
+  // Apply dagre layout for hierarchical, phase-aware positioning
+  // This minimizes edge crossings and organizes by phase
+  const layoutedNodes = applyDagreLayout(reactFlowNodes, reactFlowEdges);
+
   return {
-    nodes: reactFlowNodes,
+    nodes: layoutedNodes,
     edges: reactFlowEdges,
   };
 }
@@ -107,6 +115,7 @@ function createReactFlowNode(
       likes,
       comments,
       tags,
+      phase: diagramNode.phase, // Include phase for layout algorithm
     },
   };
 }
