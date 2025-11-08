@@ -47,14 +47,14 @@ class ContentCreatorAgent:
             temperature=temperature
         )
 
-        # Configure model for structured output using response_format
-        self.model = base_model.with_structured_output(ContentOutput)
-
-        # Create the agent
+        # Create the agent with structured output using response_format
+        # This allows LangChain to automatically select the best strategy
+        # (ProviderStrategy for models with native support, ToolStrategy otherwise)
         self.agent = create_agent(
-            self.model,
+            base_model,
             tools=[],  # No tools needed for content generation
-            system_prompt=self._get_system_prompt()
+            system_prompt=self._get_system_prompt(),
+            response_format=ContentOutput  # Pass schema directly for automatic strategy selection
         )
 
     def _get_system_prompt(self) -> str:
@@ -166,13 +166,28 @@ Use the analyzed report to understand what worked and what didn't, then create b
         """
         Extract ContentOutput from agent result.
 
+        According to LangChain docs, structured output appears in the
+        'structured_response' key of the agent's final state.
+
         Args:
             result: Agent invocation result
 
         Returns:
             ContentOutput object
         """
-        # The agent with structured output should return it in messages
+        # First, check for structured_response key (LangChain's standard location)
+        if "structured_response" in result:
+            structured_response = result["structured_response"]
+
+            # If it's already a ContentOutput, return it
+            if isinstance(structured_response, ContentOutput):
+                return structured_response
+
+            # If it's a dict, create ContentOutput
+            if isinstance(structured_response, dict):
+                return ContentOutput(**structured_response)
+
+        # Fallback: Check messages array (for backward compatibility)
         messages = result.get("messages", [])
         if messages:
             last_message = messages[-1]
@@ -200,13 +215,9 @@ Use the analyzed report to understand what worked and what didn't, then create b
                         data = json.loads(content)
                         return ContentOutput(**data)
                     except:
-                        # Fallback - return error message
-                        return ContentOutput(
-                            A="Error: Could not parse variant A",
-                            B="Error: Could not parse variant B"
-                        )
+                        pass  # Continue to fallback
 
-        # Fallback if no messages
+        # Fallback if no structured output found
         return ContentOutput(
             A="Error: No output generated for variant A",
             B="Error: No output generated for variant B"

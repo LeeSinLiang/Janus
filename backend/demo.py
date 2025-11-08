@@ -176,19 +176,17 @@ def scenario_2_generate_ab_content(campaign: Campaign, product_info: str):
         # Create ContentVariant A
         variant_a = ContentVariant.objects.create(
             post=post,
-            variant_label='A',
+            variant_id='A',
             content=content_output.A,
             platform='X',
-            status='draft'
         )
 
         # Create ContentVariant B
         variant_b = ContentVariant.objects.create(
             post=post,
-            variant_label='B',
+            variant_id='B',
             content=content_output.B,
             platform='X',
-            status='draft'
         )
 
         print(f"  ✅ Variant A ({len(content_output.A)} chars): {content_output.A[:60]}...")
