@@ -10,10 +10,3 @@ class PostMetrics(models.Model):
 
     def __str__(self):
         return f"{self.post_object.pk}"
-    
-    # generate random node_id
-    def save(self, *args, **kwargs):
-        if not self.node_id:
-            import random
-            self.node_id = random.randint(1, 1000000)
-        super().save(*args, **kwargs)

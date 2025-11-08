@@ -3,6 +3,11 @@
 import { Handle, Position } from '@xyflow/react';
 import { THEME_COLORS, getButtonStyle, getNodeHighlightStyle } from '@/styles/theme';
 
+export interface Variant {
+  title: string;
+  description: string;
+}
+
 export interface TaskCardData {
   icon: string;
   iconBg: string;
@@ -14,6 +19,9 @@ export interface TaskCardData {
   pendingApproval?: boolean;
   onApprove?: () => void;
   onReject?: () => void;
+  onClick?: () => void;
+  variant1?: Variant;
+  variant2?: Variant;
 }
 
 interface TaskCardNodeProps {
@@ -83,7 +91,15 @@ export default function TaskCardNode({ data, id }: TaskCardNodeProps) {
       )}
 
       <div
-        className="w-[300px] rounded-lg p-4 shadow-md transition-all"
+        onClick={(e) => {
+          // Don't trigger onClick if clicking approve/reject buttons
+          if (isPending) return;
+          e.stopPropagation();
+          data.onClick?.();
+        }}
+        className={`w-[300px] rounded-lg p-4 shadow-md transition-all ${
+          !isPending ? 'cursor-pointer hover:shadow-lg' : ''
+        }`}
         style={
           isPending
             ? {

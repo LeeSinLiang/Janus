@@ -1,11 +1,18 @@
 import { Node, Edge } from '@xyflow/react';
 import { NodeMetrics } from '@/types/api';
 
+interface Variant {
+  title: string;
+  description: string;
+}
+
 interface ParsedNode {
   id: string;
   title: string;
   description: string;
   subgraph?: string;
+  variant1?: Variant;
+  variant2?: Variant;
 }
 
 interface ParsedEdge {
@@ -73,7 +80,36 @@ export function parseMermaidGraph(mermaidText: string, metrics?: NodeMetrics[]):
       continue;
     }
 
-    // Parse node definition: NODE1[<title>Title</title><description>Desc</description>]
+    // Parse node definition with optional variants:
+    // NODE1[<title>Title</title><description>Desc</description><variant1_title>V1</variant1_title><variant1_description>V1 Desc</variant1_description><variant2_title>V2</variant2_title><variant2_description>V2 Desc</variant2_description>]
+
+    // First try to match with variants
+    const nodeWithVariantsMatch = line.match(/^(\w+)\[<title>([^<]+)<\/title><description>([^<]+)<\/description><variant1_title>([^<]+)<\/variant1_title><variant1_description>([^<]+)<\/variant1_description><variant2_title>([^<]+)<\/variant2_title><variant2_description>([^<]+)<\/variant2_description>\]/);
+    if (nodeWithVariantsMatch) {
+      const [, id, title, description, v1Title, v1Desc, v2Title, v2Desc] = nodeWithVariantsMatch;
+      const node: ParsedNode = {
+        id,
+        title: title.trim(),
+        description: description.trim(),
+        subgraph: currentSubgraph,
+        variant1: {
+          title: v1Title.trim(),
+          description: v1Desc.trim(),
+        },
+        variant2: {
+          title: v2Title.trim(),
+          description: v2Desc.trim(),
+        },
+      };
+      parsedNodes.push(node);
+
+      if (currentSubgraph && subgraphs.has(currentSubgraph)) {
+        subgraphs.get(currentSubgraph)!.push(node);
+      }
+      continue;
+    }
+
+    // Fall back to simple node without variants
     const nodeMatch = line.match(/^(\w+)\[<title>([^<]+)<\/title><description>([^<]+)<\/description>\]/);
     if (nodeMatch) {
       const [, id, title, description] = nodeMatch;
@@ -209,6 +245,8 @@ function createReactFlowNode(
       likes,
       comments,
       tags,
+      ...(parsedNode.variant1 && { variant1: parsedNode.variant1 }),
+      ...(parsedNode.variant2 && { variant2: parsedNode.variant2 }),
     },
   };
 }
