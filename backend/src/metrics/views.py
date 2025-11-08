@@ -1,6 +1,4 @@
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
-from agents.models import Campaign
 import os
 import requests
 from dotenv import load_dotenv
@@ -20,18 +18,11 @@ auth = OAuth1(
 )
 
 
-
 # Create your views here.
 @api_view(['GET'])
 def nodesJSON(request):
     qs = Post.objects.filter(campaign=Campaign.objects.first())
     serializer = PostSerializer(qs, many=True)
-    return Response(serializer.data)
-
-@api_view(['GET'])
-def metricsJSON(request):
-    qs = PostMetrics.objects.all()
-    serializer = PostMetricsSerializer(qs, many=True)
     return Response(serializer.data)
 
 @api_view(['POST'])
@@ -40,40 +31,72 @@ def createXPost(request):
     if not pk:
         return Response({"error": "Missing 'pk' field"}, status=400)
     
-    variantId = Post.objects.get(pk=pk).selected_variant
-    selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=Post.objects.get(pk=pk))
+    post = Post.objects.get(pk=pk)
+    variantId = post.selected_variant
+    selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=post)
     text = selectedVariant.content
 
     url = "https://api.x.com/2/tweets"
     headers = {
-        "Authorization": f"Bearer {settings.X_ACCESS_TOKEN}",
+        # "Authorization": f"Bearer {settings.X_ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
     body = {"text": text}
 
     resp = requests.post(url, headers=headers, json=body, auth=auth)
+    data = resp.json()
+
     if resp.status_code == 201:
-        return Response(resp.json(), status=201)
-    else:
-        return Response({"error": resp.json()}, status=resp.status_code)
+        tweet_id = (data.get("data")).get("id")
+        if tweet_id:
+            postMetrics = post.metrics
+            postMetrics.tweet_id = tweet_id
+            post.status = "published"
+            postMetrics.save()
+            post.save()
+
+    return Response(resp.json(), status=resp.status_code)
     
-@api_view(['GET'])
-def getXPostMetrics(request, tweet_id):
-    access_token = settings.X_ACCESS_TOKEN
+@api_view(['POST'])
+def getXPostMetrics(request):
+    pk = request.data.get("pk")
+    if not pk:
+        return Response({"error": "Missing 'pk' field"}, status=400)
+    
+    post = Post.objects.get(pk=pk)
+    postMetrics = post.metrics
+    tweet_id = postMetrics.tweet_id
+
     url = f"https://api.x.com/2/tweets"
     headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {settings.X_USER_BEARER_TOKEN}",  # <- user-context token
+        "Content-Type": "application/json",
     }
     params = {
         "ids": tweet_id,
         "tweet.fields": "public_metrics,non_public_metrics"
     }
+    
     resp = requests.get(url, headers=headers, params=params)
+    data = resp.json()
+
     if resp.status_code == 200:
-        return Response(resp.json(), status=200)
-    else:
-        return Response({"error": resp.json()}, status=resp.status_code)
+        d = data["data"][0]
+        pub = d.get("public_metrics", {})
+        nonpub = d.get("non_public_metrics", {})
+        PostMetrics.objects.filter(tweet_id=tweet_id).update(
+            likes=pub.get("like_count", 0),
+            retweets=pub.get("retweet_count", 0),
+            impressions=nonpub.get("impression_count", 0),
+        )
+        return Response(data, status=200)
+    return Response({"error": data}, status=resp.status_code)
+
+@api_view(['GET'])
+def metricsJSON(request):
+    qs = PostMetrics.objects.all()
+    serializer = PostMetricsSerializer(qs, many=True)
+    return Response(serializer.data)
 
 @api_view(['POST'])
 @csrf_exempt
