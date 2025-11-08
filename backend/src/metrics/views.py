@@ -47,7 +47,10 @@ def createXPost(request):
 		return Response({"error": "Missing 'pk' field"}, status=400)
 
 	post = Post.objects.get(pk=pk)
-	variantId = post.selected_variant
+	if post.selected_variant == None:
+		variantId = "A"
+	else:
+		variantId = post.selected_variant
 	selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=post)
 	text = selectedVariant.content
 
@@ -74,35 +77,46 @@ def createXPost(request):
 	
 @api_view(['POST'])
 def getXPostMetrics(request):
-	pk = request.data.get("pk")
-	if not pk:
-		return Response({"error": "Missing 'pk' field"}, status=400)
+    pk = request.data.get("pk")
+    if not pk:
+        return Response({"error": "Missing 'pk' field"}, status=400)
 
-	post = Post.objects.get(pk=pk)
-	postMetrics = post.metrics
-	tweet_id = postMetrics.tweet_id
+    post = Post.objects.get(pk=pk)
+    postMetrics = post.metrics
+    tweet_id = postMetrics.tweet_id
 
-	# Use clone API instead of real Twitter API
-	url = f"http://localhost:8000/clone/2/tweets"
-	headers = {
-		"Content-Type": "application/json",
-	}
-	params = {
-		"ids": tweet_id,
-		"tweet.fields": "public_metrics"
-	}
+    # Use clone API instead of real Twitter API
+    url = f"http://localhost:8000/clone/2/metrics/"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    body = {"tweet_ids": tweet_id}
 
-	resp = requests.get(url, headers=headers, params=params)
-	data = resp.json()
+    resp = requests.post(url, headers=headers, json=body)
+    data = resp.json()
 
-	if resp.status_code == 200:
-		d = data["data"][0]
-		pub = d.get("public_metrics", {})
-		postMetrics.likes = pub.get("like_count", 0)
-		postMetrics.retweets = pub.get("retweet_count", 0)
-		postMetrics.save()
-		return Response(data, status=200)
-	return Response({"error": data}, status=resp.status_code)
+    if resp.status_code != 200:
+        return Response({"error": resp.text}, status=resp.status_code)
+    
+    data = resp.json()
+    items = data.get("data") or []
+    if not items:
+        return Response({"error": "Tweet not found in clone API."}, status=404)
+
+    d = items[0]
+    pub = d.get("public_metrics", {})
+    nonpub = d.get("non_public_metrics", {})
+
+    retweetCount = pub.get("retweet_count")
+    likeCount = pub.get("like_count")
+    impressionCount = nonpub.get("impression_count")
+
+    postMetrics.retweets = retweetCount
+    postMetrics.likes = likeCount
+    postMetrics.impressions = impressionCount
+    postMetrics.save()
+
+    return Response(resp.json(), status=resp.status_code)
 
 @api_view(['GET'])
 def metricsJSON(request):
