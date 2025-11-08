@@ -3,18 +3,18 @@ import os
 import requests
 from dotenv import load_dotenv
 from django.conf import settings
-from .models import NodeMetrics
+from .models import PostMetrics
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .serializer import NodeMetricsSerializer
+from .serializer import PostMetricsSerializer
 
 
 
 # Create your views here.
 @api_view(['GET'])
 def metricsJSON(request):
-    qs = NodeMetrics.objects.all()
-    serializer = NodeMetricsSerializer(qs, many=True)
+    qs = PostMetrics.objects.all()
+    serializer = PostMetricsSerializer(qs, many=True)
     return Response(serializer.data) 
 
 @api_view(['POST'])
