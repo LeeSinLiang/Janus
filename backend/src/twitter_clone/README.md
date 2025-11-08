@@ -1,4 +1,4 @@
-# Twitter Clone API
+# Twitter Clone API & Web UI
 
 A bare-bones Twitter/X clone that mimics the Twitter API v2 response format. This allows the Janus backend to test and develop without hitting rate limits or waiting for 15-minute metric updates from the real Twitter API.
 
@@ -9,6 +9,7 @@ A bare-bones Twitter/X clone that mimics the Twitter API v2 response format. Thi
 - ✅ Real-time metrics (no 15-minute delay)
 - ✅ Twitter API v2 compatible response format
 - ✅ Media upload support (images/videos)
+- ✅ **NEW: Web UI** - Interactive web interface with Twitter-like design
 
 ## Models
 
@@ -38,9 +39,42 @@ A bare-bones Twitter/X clone that mimics the Twitter API v2 response format. Thi
 - Tracks views/impressions
 - Auto-incremented on each tweet fetch
 
+## Web UI
+
+Access the interactive web interface at: **http://localhost:8000/clone/**
+
+### UI Features
+
+- **Home Feed** (`/clone/`) - View all tweets in reverse chronological order
+- **Create Tweet** (`/clone/create/`) - Post text, images, or videos with character counter
+- **Tweet Detail** (`/clone/tweet/<tweet_id>/`) - View individual tweet with all comments
+- **Like/Retweet** - Toggle actions with visual feedback
+- **Comment** - Add replies to any tweet
+- **Real-time Stats** - See likes, retweets, replies, and impressions instantly
+
+### UI Screenshots
+
+The interface features:
+- Dark theme matching Twitter's design
+- Responsive layout (mobile-friendly)
+- Character counter for tweets (280 max)
+- Media preview for images and videos
+- Real-time metrics without page refresh
+- Smooth animations and transitions
+
+### Navigation
+
+```
+Home (/)                    → View all tweets, like/retweet from feed
+  ↓
+Create Tweet (/create/)     → Post new content with media
+  ↓
+Tweet Detail (/tweet/ID/)   → View comments, add replies
+```
+
 ## API Endpoints
 
-All endpoints are prefixed with `/clone/`
+All API endpoints are prefixed with `/clone/`
 
 ### POST /clone/2/tweets
 Create a new tweet.
@@ -246,7 +280,25 @@ Access the Django admin at `http://localhost:8000/admin/` to:
 
 ## Testing
 
-You can test the clone API directly:
+### Using the Web UI (Easiest)
+
+1. Start the server:
+```bash
+cd backend/src
+python manage.py runserver
+```
+
+2. Open your browser and go to: **http://localhost:8000/clone/**
+
+3. Click "Post a Tweet" to create your first tweet
+
+4. Like, retweet, and comment on tweets directly from the UI
+
+5. Click on any tweet to see its detail page with comments
+
+### Using the API Directly
+
+You can also test the clone API with curl:
 
 ```bash
 # Create a tweet
