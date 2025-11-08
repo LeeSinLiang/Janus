@@ -18,8 +18,10 @@ import '@xyflow/react/dist/style.css';
 import TaskCardNode from './TaskCardNode';
 import ChatBox from './ChatBox';
 import ViewToggle from './ViewToggle';
+import NodeVariantModal from './NodeVariantModal';
 import { useGraphData } from '@/hooks/useGraphData';
 import { approveNode, rejectNode } from '@/services/api';
+import { Node as FlowNode } from '@xyflow/react';
 
 const nodeTypes = {
   taskCard: TaskCardNode,
@@ -36,6 +38,9 @@ export default function CanvasWithPolling() {
 
   // Rejection flow state
   const [rejectionState, setRejectionState] = useState<RejectionState | null>(null);
+
+  // Modal state for viewing node variants
+  const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
 
   // Fetch graph data with automatic polling and diff-based updates
   // The hook now handles all diffing internally and preserves positions
@@ -125,6 +130,44 @@ export default function CanvasWithPolling() {
     setRejectionState(null);
   }, []);
 
+  // Handle node click to show variants
+  const handleNodeClick = useCallback((node: FlowNode) => {
+    // Only show modal if the node has variants
+    if (node.data?.variant1 && node.data?.variant2) {
+      setSelectedNode(node);
+    }
+  }, []);
+
+  // Handle variant selection
+  const handleSelectVariant = useCallback((variantNumber: 1 | 2) => {
+    if (!selectedNode) return;
+
+    // Update the node with the selected variant
+    const selectedVariant = variantNumber === 1
+      ? (selectedNode.data.variant1 as { title: string; description: string } | undefined)
+      : (selectedNode.data.variant2 as { title: string; description: string } | undefined);
+
+    if (selectedVariant) {
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === selectedNode.id
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  title: selectedVariant.title,
+                  description: selectedVariant.description,
+                },
+              }
+            : node
+        )
+      );
+    }
+
+    // Close modal
+    setSelectedNode(null);
+  }, [selectedNode, setNodes]);
+
   // Add handlers to node data
   const nodesWithHandlers = nodes.map((node) => ({
     ...node,
@@ -132,6 +175,7 @@ export default function CanvasWithPolling() {
       ...node.data,
       onApprove: () => handleApproveNode(node.id),
       onReject: () => handleRejectNode(node.id),
+      onClick: () => handleNodeClick(node),
     },
   }));
 
@@ -184,8 +228,37 @@ export default function CanvasWithPolling() {
     );
   }
 
+  // Prepare variant modal data
+  const variantModalData = selectedNode && selectedNode.data?.variant1 && selectedNode.data?.variant2 ? {
+    variant1: selectedNode.data.variant1 as { title: string; description: string },
+    variant2: selectedNode.data.variant2 as { title: string; description: string },
+    icon: selectedNode.data.icon as string | undefined,
+    iconBg: selectedNode.data.iconBg as string | undefined,
+  } : null;
+
   return (
     <div className="relative h-full w-full bg-gray-50">
+      {/* Node Variant Modal */}
+      {variantModalData && (
+        <NodeVariantModal
+          isOpen={!!selectedNode}
+          onClose={() => setSelectedNode(null)}
+          variant1={{
+            title: variantModalData.variant1.title,
+            description: variantModalData.variant1.description,
+            icon: variantModalData.icon,
+            iconBg: variantModalData.iconBg,
+          }}
+          variant2={{
+            title: variantModalData.variant2.title,
+            description: variantModalData.variant2.description,
+            icon: variantModalData.icon,
+            iconBg: variantModalData.iconBg,
+          }}
+          onSelectVariant={handleSelectVariant}
+        />
+      )}
+
       {/* View Toggle - positioned at top left */}
       <div className="absolute left-8 top-8 z-10">
         <ViewToggle activeView={activeView} onViewChange={setActiveView} />

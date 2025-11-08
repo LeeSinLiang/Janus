@@ -93,7 +93,7 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
   return {
     diagram: `graph TB
     subgraph "Phase 1"
-        NODE1[<title>Instagram post</title><description>Create an Instagram carousel post (5 slides) highlighting our top features. Create an Instagram carousel post</description>]
+        NODE1[<title>Instagram post</title><description>Create an Instagram carousel post (5 slides) highlighting our top features. Create an Instagram carousel post</description><variant1_title>Feature-focused</variant1_title><variant1_description>Feature-focused version...</variant1_description><variant2_title>Emotion-focused</variant2_title><variant2_description>Emotion-focused version ...</variant2_description>]
         NODE2[<title>X post</title><description>Create an Instagram carousel post (5 slides) highlighting our top features.</description>]
         NODE3[<title>Instagram Reels</title><description>Create an Instagram carousel post (5 slides) highlighting our top features.</description>]
     end
