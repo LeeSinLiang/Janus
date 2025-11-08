@@ -6,9 +6,9 @@ const GRAPH_ENDPOINT = '/api/graph';
 
 /**
  * Fetch graph data from the backend (Version 1)
- * Expects plain Post[] array from /nodesJson/
+ * Expects { diagram: Post[], metrics: Record<string, NodeMetrics> } from /nodesJson/
  */
-export async function fetchGraphDataV1(): Promise<DiagramNode[]> {
+export async function fetchGraphDataV1(): Promise<GraphResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/nodesJson/`, {
       method: 'GET',
@@ -27,8 +27,21 @@ export async function fetchGraphDataV1(): Promise<DiagramNode[]> {
       throw error;
     }
 
-    const data: DiagramNode[] = await response.json();
-    return data;
+    const data = await response.json();
+
+    // Convert metrics object keys from strings to numbers
+    const metricsWithNumberKeys: Record<number, any> = {};
+    if (data.metrics && typeof data.metrics === 'object') {
+      Object.keys(data.metrics).forEach(key => {
+        metricsWithNumberKeys[Number(key)] = data.metrics[key];
+      });
+    }
+
+    return {
+      diagram: data.diagram || [],
+      metrics: metricsWithNumberKeys,
+      changes: true, // Always process on fetch
+    };
   } catch (error) {
     console.error('Error fetching graph data V1:', error);
     throw error;
@@ -262,13 +275,13 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
         phase: 'Phase 3',
       },
     ],
-    metrics: [
-      { pk: '1', likes: 124, impressions: 1570, retweets: 45 },
-      { pk: '2', likes: 98, impressions: 2034, retweets: 67 },
-      { pk: '3', likes: 215, impressions: 3098, retweets: 120 },
-      { pk: '4', likes: 56, impressions: 890, retweets: 10 },
-      { pk: '5', likes: 180, impressions: 2500, retweets: 85 },
-    ],
+    metrics: {
+      1: { likes: 124, impressions: 1570, retweets: 45 },
+      2: { likes: 98, impressions: 2034, retweets: 67 },
+      3: { likes: 215, impressions: 3098, retweets: 120 },
+      4: { likes: 56, impressions: 890, retweets: 10 },
+      5: { likes: 180, impressions: 2500, retweets: 85 },
+    },
     changes: false,
   };
 }

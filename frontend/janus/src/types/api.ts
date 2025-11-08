@@ -11,7 +11,6 @@ export interface DiagramNode {
 }
 
 export interface NodeMetrics {
-  pk: string;
   likes: number;
   impressions: number;
   retweets: number;
@@ -19,7 +18,7 @@ export interface NodeMetrics {
 
 export interface GraphResponse {
   diagram: DiagramNode[];
-  metrics: NodeMetrics[];
+  metrics: Record<number, NodeMetrics>; // Object with pk as key
   changes: boolean;
 }
 

@@ -48,18 +48,9 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
   const fetchAndProcessData = useCallback(async () => {
     try {
       // Use mock or real API based on configuration
-      let data;
-      if (useMockData) {
-        data = await fetchGraphDataMock();
-      } else {
-        // Use V1 which returns plain array, wrap it in expected format
-        const diagramNodes = await fetchGraphDataV1();
-        data = {
-          diagram: diagramNodes,
-          metrics: [], // No metrics from backend yet
-          changes: true, // Always process on fetch
-        };
-      }
+      const data = useMockData
+        ? await fetchGraphDataMock()
+        : await fetchGraphDataV1();
 
       // Always load data on initial fetch, then check changes flag for subsequent polls
       const shouldProcess = isInitialLoadRef.current || data.changes;

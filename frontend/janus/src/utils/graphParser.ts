@@ -24,23 +24,15 @@ const DEFAULT_COLORS = ['#E4405F', '#FF0000', '#000000', '#3B82F6', '#10B981', '
  * Applies automatic dagre layout for phase-aware hierarchical positioning
  *
  * @param diagramNodes - Array of diagram nodes from backend
- * @param metrics - Optional array of metrics to apply to nodes
+ * @param metrics - Optional object of metrics keyed by post pk
  * @returns Positioned nodes and edges ready for ReactFlow
  */
 export function parseGraphData(
   diagramNodes: DiagramNode[],
-  metrics?: NodeMetrics[]
+  metrics?: Record<number, NodeMetrics>
 ): ParseResult {
-  // Create a map for quick metrics lookup
-  const metricsMap = new Map<number, NodeMetrics>();
-  if (metrics) {
-    metrics.forEach(metric => {
-      metricsMap.set(Number(metric.pk), metric);
-    });
-  }
-
   // Convert diagram nodes to ReactFlow nodes (with temporary positions)
-  const reactFlowNodes = convertNodesToReactFlow(diagramNodes, metricsMap);
+  const reactFlowNodes = convertNodesToReactFlow(diagramNodes, metrics || {});
 
   // Convert next_posts relationships to edges
   const reactFlowEdges = convertEdgesToReactFlow(diagramNodes);
@@ -60,7 +52,7 @@ export function parseGraphData(
  */
 function convertNodesToReactFlow(
   diagramNodes: DiagramNode[],
-  metricsMap: Map<number, NodeMetrics>
+  metricsMap: Record<number, NodeMetrics>
 ): Node[] {
   const nodes: Node[] = [];
 
@@ -89,7 +81,7 @@ function createReactFlowNode(
   x: number,
   y: number,
   index: number,
-  metricsMap: Map<number, NodeMetrics>
+  metricsMap: Record<number, NodeMetrics>
 ): Node {
   // Assign icon and color based on index (cycling through available options)
   const icon = DEFAULT_ICONS[index % DEFAULT_ICONS.length];
@@ -99,7 +91,7 @@ function createReactFlowNode(
   const tags = [ATTRIBUTES.FEATURE, ATTRIBUTES.PLANNED];
 
   // Get metrics for this node if available
-  const metrics = metricsMap.get(diagramNode.pk);
+  const metrics = metricsMap[diagramNode.pk];
   const likes = metrics?.likes ?? 1;
   const comments = metrics?.retweets ?? 0; // Using retweets as comments
 
