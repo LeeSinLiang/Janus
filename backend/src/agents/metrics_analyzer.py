@@ -3,6 +3,7 @@ Metrics Analyzer Agent
 Analyzes engagement metrics from X API, provides insights, and recommends optimizations.
 """
 
+from typing import List
 from typing import Dict, Any, Optional
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -11,15 +12,20 @@ from pydantic import BaseModel, Field
 import os
 import json
 
+from debug import debug_print
+
 
 # =====================
 # Output Schema
 # =====================
 
-class MetricsAnalysis(BaseModel):
+class SingleMetricsAnalysis(BaseModel):
 	"""Schema for metrics analysis output"""
 	analyzed_report: str = Field(description="Detailed analysis report with insights and recommendations")
-
+ 
+class MetricsAnalysis(BaseModel):
+	"""Schema for list of metrics analysis output per post, supporting A/B comparison"""
+	analysis: List[SingleMetricsAnalysis] = Field(description="List of analysis reports for each post analysis")
 
 # =====================
 # Metrics Analyzer Agent
@@ -50,16 +56,9 @@ class MetricsAnalyzerAgent:
 		# Initialize model using ChatGoogleGenerativeAI
 		self.model = ChatGoogleGenerativeAI(
 			model=model_name,
-			temperature=temperature
+			temperature=temperature,
+			thinking_budget=0
 		)
-
-		# Set up structured output parser
-
-		# Create the prompt template
-		self.prompt = ChatPromptTemplate.from_messages([
-			("system", self._get_system_prompt()),
-			("user", "{metrics_input}")
-		])
 
 		self.agent = create_agent(
 			self.model,
@@ -164,12 +163,6 @@ FORMATTING:
 - Provide concrete examples
 - Keep recommendations specific and actionable
 
-OUTPUT FORMAT:
-Return a JSON object with this exact structure:
-{{
-  "analyzed_report": "your comprehensive markdown-formatted analysis report here"
-}}
-
 IMPORTANT: Be thorough but concise. Focus on actionable insights over generic observations."""
 
 	def execute(self, metrics_data: Dict[str, Any]) -> MetricsAnalysis:
@@ -219,9 +212,8 @@ Provide a comprehensive analysis with insights and specific recommendations."""
 		result = self.agent.invoke({
 			"messages": [{"role": "user", "content": metrics_input}]
 		})
-
 		# Return as MetricsAnalysis object
-		return MetricsAnalysis(**result)
+		return MetricsAnalysis.model_validate(result['structured_response'])
 
 
 # =====================

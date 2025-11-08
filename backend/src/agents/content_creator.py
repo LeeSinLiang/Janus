@@ -4,10 +4,12 @@ Generates marketing content with A/B variants for testing.
 """
 
 import os
-from typing import Dict, Any
+from typing import Dict, Any, List
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import create_agent
 from pydantic import BaseModel, Field
+
+from agents.metrics_analyzer import MetricsAnalysis, SingleMetricsAnalysis
 
 
 # =====================
@@ -120,7 +122,7 @@ Each variant must be plain text under 280 characters."""
         description: str,
         product_info: str,
         old_content: str,
-        analyzed_report: str
+        analyzed_report: List[SingleMetricsAnalysis]
     ) -> ContentOutput:
         """
         Generate improved A/B content variants based on metrics analysis (Scenario 3).
@@ -130,11 +132,12 @@ Each variant must be plain text under 280 characters."""
             description: Content description
             product_info: Product information
             old_content: Previous content that was tested
-            analyzed_report: Metrics analysis report with insights
+            analyzed_report: List of Metrics analysis report with insights
 
         Returns:
             ContentOutput with improved A and B variants based on metrics
         """
+    
         request = f"""Create two IMPROVED tweet variants based on metrics analysis:
 
 Title: {title}
