@@ -131,7 +131,7 @@ Please:
 
         # Extract output
         output = self._extract_output(result)
-        return {"output": output, "raw_result": result}
+        return {"output": output}
 
     def analyze_campaign(
         self,
@@ -287,7 +287,7 @@ Make it comprehensive but actionable."""
 
         # Extract output
         output = self._extract_output(result)
-        return {"output": output, "raw_result": result}
+        return {"output": output}
 
     def _extract_output(self, result: Dict[str, Any]) -> str:
         """Helper to extract output from agent result"""
