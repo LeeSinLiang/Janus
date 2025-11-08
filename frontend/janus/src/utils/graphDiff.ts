@@ -177,10 +177,11 @@ export function applyGraphDiff(
 /**
  * Position new nodes intelligently based on existing nodes
  * Also marks them as pending approval
+ * Uses phase-aware positioning to maintain layout structure
  */
 function positionNewNodes(existingNodes: Node[], newNodes: Node[]): Node[] {
   if (existingNodes.length === 0) {
-    // No existing nodes, use positions from parser and mark as pending
+    // No existing nodes, use positions from parser (dagre layout) and mark as pending
     return newNodes.map(node => ({
       ...node,
       data: {
@@ -190,23 +191,49 @@ function positionNewNodes(existingNodes: Node[], newNodes: Node[]): Node[] {
     }));
   }
 
-  // Find the bottom-most node
-  const maxY = Math.max(...existingNodes.map(node => node.position.y));
-  const VERTICAL_SPACING = 300;
-  const HORIZONTAL_SPACING = 400;
+  // Group existing nodes by phase to understand layout structure
+  const nodesByPhase = new Map<string, Node[]>();
+  existingNodes.forEach(node => {
+    const phase = String(node.data?.phase || 'Phase 1');
+    if (!nodesByPhase.has(phase)) {
+      nodesByPhase.set(phase, []);
+    }
+    nodesByPhase.get(phase)!.push(node);
+  });
 
-  // Position new nodes in a row below existing nodes and mark as pending
-  return newNodes.map((node, index) => ({
-    ...node,
-    position: {
-      x: 50 + (index * HORIZONTAL_SPACING),
-      y: maxY + VERTICAL_SPACING,
-    },
-    data: {
-      ...node.data,
-      pendingApproval: true, // Mark new nodes for approval
-    },
-  }));
+  // Position new nodes based on their phase
+  return newNodes.map((node) => {
+    const phase = String(node.data?.phase || 'Phase 1');
+    const nodesInSamePhase = nodesByPhase.get(phase) || [];
+
+    if (nodesInSamePhase.length > 0) {
+      // Position below other nodes in the same phase
+      const avgX = nodesInSamePhase.reduce((sum, n) => sum + n.position.x, 0) / nodesInSamePhase.length;
+      const maxY = Math.max(...nodesInSamePhase.map(n => n.position.y));
+
+      return {
+        ...node,
+        position: {
+          x: avgX,
+          y: maxY + 300, // Below existing nodes in same phase
+        },
+        data: {
+          ...node.data,
+          pendingApproval: true,
+        },
+      };
+    } else {
+      // No nodes in this phase yet, use position from parser (dagre)
+      // New node will maintain its layout-calculated position
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          pendingApproval: true,
+        },
+      };
+    }
+  });
 }
 
 /**
