@@ -1,2 +1,7 @@
 .commitlm-config.json
 env/
+.claude
+.mcp.json
+__pycache__
+*.pyc
+.git
