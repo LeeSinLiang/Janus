@@ -10,8 +10,6 @@ class PostMetricsSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PostSerializer(serializers.ModelSerializer):
-    description = serializers.SerializerMethodField()
-
     class Meta:
         model = Post
         fields = ('pk', 'title', 'description', 'next_posts', 'phase')
