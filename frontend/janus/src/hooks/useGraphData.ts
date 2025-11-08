@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
-import { fetchGraphData, fetchGraphDataMock, fetchGraphDataV1, fetchGraphDataV2 } from '@/services/api';
+import { fetchGraphData, fetchGraphDataMock, fetchGraphDataV1, fetchGraphDataV2, getXPostMetrics } from '@/services/api';
 import { parseGraphData } from '@/utils/graphParser';
 import { diffGraphData, applyGraphDiff } from '@/utils/graphDiff';
 
@@ -47,6 +47,22 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
    */
   const fetchAndProcessData = useCallback(async () => {
     try {
+      // First, fetch current nodes to get their pks for metrics update
+      if (!useMockData && !isInitialLoadRef.current) {
+        // Only fetch metrics on subsequent polls (not initial load)
+        const currentData = await fetchGraphDataV1();
+
+        // Sequentially fetch metrics for all nodes
+        for (const node of currentData.diagram) {
+          try {
+            await getXPostMetrics(String(node.pk));
+          } catch (error) {
+            // Continue even if one node fails
+            console.warn(`Failed to fetch metrics for node ${node.pk}:`, error);
+          }
+        }
+      }
+
       // Use mock or real API based on configuration
       const data = useMockData
         ? await fetchGraphDataMock()

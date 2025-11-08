@@ -158,6 +158,32 @@ export async function createXPost(nodePk: string): Promise<any> {
 }
 
 /**
+ * Get X post metrics for a node - sends POST request with node pk
+ * Updates the post metrics in the database
+ */
+export async function getXPostMetrics(nodePk: string): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/getXPostMetrics/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pk: nodePk }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get X post metrics: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error getting X post metrics:', error);
+    throw error;
+  }
+}
+
+/**
  * Reject a node - sends POST request with node pk and rejection message
  */
 export async function rejectNode(nodePk: string, rejectMessage: string): Promise<void> {
