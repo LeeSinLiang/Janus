@@ -95,6 +95,9 @@ function createReactFlowNode(
   const likes = metrics?.likes ?? 1;
   const comments = metrics?.retweets ?? 0; // Using retweets as comments
 
+  // Check if node is pending approval (status === 'draft')
+  const pendingApproval = diagramNode.status === 'draft';
+
   return {
     id: String(diagramNode.pk),
     type: 'taskCard',
@@ -108,6 +111,7 @@ function createReactFlowNode(
       comments,
       tags,
       phase: diagramNode.phase, // Include phase for layout algorithm
+      pendingApproval, // Flag for showing approve/reject buttons
     },
   };
 }

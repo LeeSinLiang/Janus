@@ -20,14 +20,15 @@ export default function WelcomePage() {
     setIsLoading(true);
 
     try {
-      await generateStrategy({
+      const response = await generateStrategy({
         product_description: productDescription,
         gtm_goals: gtmGoals,
         campaign_name: 'Campaign',
       });
 
-      // Navigate to canvas after successful generation
-      router.push('/canvas');
+      // Navigate to canvas with campaign_id
+      const campaignId = response.campaign_id;
+      router.push(`/canvas?campaign_id=${campaignId}`);
     } catch (error) {
       console.error('Failed to generate strategy:', error);
       setIsLoading(false);

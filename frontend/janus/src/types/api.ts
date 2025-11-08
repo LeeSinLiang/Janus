@@ -8,6 +8,7 @@ export interface DiagramNode {
   description: string;
   next_posts: number[];
   phase: string;
+  status?: string; // draft, published, etc.
 }
 
 export interface NodeMetrics {

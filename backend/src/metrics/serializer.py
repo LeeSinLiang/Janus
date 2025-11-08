@@ -12,7 +12,7 @@ class PostMetricsSerializer(serializers.ModelSerializer):
 class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
-        fields = ('pk', 'title', 'description', 'next_posts', 'phase')
+        fields = ('pk', 'title', 'description', 'next_posts', 'phase', 'status')
 
 
 class IGMetricsSerializer(serializers.ModelSerializer):

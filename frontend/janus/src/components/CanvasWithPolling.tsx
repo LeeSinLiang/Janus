@@ -37,7 +37,11 @@ interface RejectionState {
   nodeName: string;
 }
 
-export default function CanvasWithPolling() {
+interface CanvasWithPollingProps {
+  campaignId?: string;
+}
+
+export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps) {
   // View state
   const [activeView, setActiveView] = useState<'node-editor' | 'chart'>('node-editor');
 
