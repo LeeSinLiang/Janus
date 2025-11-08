@@ -19,7 +19,7 @@ def getMetricsDB():
 	out = {}
 	for post in posts:
 		m = getattr(post, "metrics", None)
-		out[post.pk] = {
+		out[int(post.pk)] = {
 			"likes": m.likes if m else 0,
 			"impressions": m.impressions if m else 0,
 			"retweets": m.retweets if m else 0,
