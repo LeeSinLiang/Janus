@@ -2,15 +2,15 @@ from django.db import models
 from agents.models import Post
 
 # Create your models here.
-class NodeMetrics(models.Model):
-    post_id = models.ForeignKey(Post.post_id, on_delete=models.CASCADE)
+class PostMetrics(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
     likes = models.IntegerField(default=0)
     impressions = models.IntegerField(default=0)
     retweets = models.IntegerField(default=0)
-    node_id = models.IntegerField()
+    tweet_id = models.CharField(max_length=50)
 
     def __str__(self):
-        return f"{self.pk}"
+        return f"{self.post.pk}"
     
     # generate random node_id
     def save(self, *args, **kwargs):
@@ -18,11 +18,3 @@ class NodeMetrics(models.Model):
             import random
             self.node_id = random.randint(1, 1000000)
         super().save(*args, **kwargs)
-
-
-class Node(models.Model):
-    node_id = models.IntegerField(primary_key=True)
-    
-
-    def __str__(self):
-        return self.name

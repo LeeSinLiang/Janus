@@ -20,7 +20,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "janus.settings")
 import django
 django.setup()
 
-from agents import (
+from src.agents import (
     create_orchestrator,
     create_strategy_planner,
     create_content_creator,
