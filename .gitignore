@@ -1,2 +1,4 @@
 .commitlm-config.json
 env/
+.claude
+.mcp.json
