@@ -313,30 +313,61 @@ def run_sequential_demo():
 	╚════════════════════════════════════════════════════════════════════════════╝
 	""")
 
-	# Define product info
-	product_description = (
-		"Janus is an AI-powered GTM Operating System designed for technical founders. "
-		"It automates marketing strategy planning, content creation with A/B testing, "
-		"and metrics-driven optimization across social platforms like X and ProductHunt."
-	)
-	gtm_goals = "Launch product and acquire first 100 users in 4 weeks using X and ProductHunt"
+	# Get user input for product info
+	print("\n📝 Please provide your product information:\n")
 
-	print("Product:", product_description[:80] + "...")
+	print("Enter your product description:")
+	print("(Press Enter twice when done, or leave blank for default example)\n")
+
+	lines = []
+	while True:
+		line = input()
+		if line == "":
+			if len(lines) > 0 and lines[-1] == "":
+				lines.pop()  # Remove the last empty line
+				break
+			lines.append(line)
+			if len(lines) == 1:  # First empty line
+				break
+		else:
+			lines.append(line)
+
+	product_description = " ".join(lines).strip()
+
+	# Use default if empty
+	if not product_description:
+		product_description = (
+			"Janus is an AI-powered GTM Operating System designed for technical founders. "
+			"It automates marketing strategy planning, content creation with A/B testing, "
+			"and metrics-driven optimization across social platforms like X and ProductHunt."
+		)
+		print("Using default product description.")
+
+	print("\nEnter your GTM goals:")
+	print("(Or press Enter for default example)\n")
+	gtm_goals = input().strip()
+
+	if not gtm_goals:
+		gtm_goals = "Launch product and acquire first 100 users in 4 weeks using X and ProductHunt"
+		print("Using default GTM goals.")
+
+	print("\n" + "=" * 80)
+	print("Product:", product_description[:80] + ("..." if len(product_description) > 80 else ""))
 	print("Goal:", gtm_goals)
+	print("=" * 80)
 
 	try:
 		# Scenario 1: Strategy Planning
-		# mermaid_diagram, campaign = scenario_1_strategy_planning(product_description, gtm_goals)
+		mermaid_diagram, campaign = scenario_1_strategy_planning(product_description, gtm_goals)
 
-		# input("\n⏸️  Press Enter to continue to Scenario 2...")
+		input("\n⏸️  Press Enter to continue to Scenario 2...")
 
-		# # Scenario 2: Generate A/B Content
-		# scenario_2_generate_ab_content(campaign, product_description)
+		# Scenario 2: Generate A/B Content
+		scenario_2_generate_ab_content(campaign, product_description)
 
-		# input("\n⏸️  Press Enter to continue to Scenario 3...")
+		input("\n⏸️  Press Enter to continue to Scenario 3...")
 
 		# Scenario 3: Metrics Analysis & Improvement
-		campaign:Campaign = Campaign.objects.first()  # For demo, get first campaign
 		scenario_3_metrics_analysis_and_improvement(campaign, product_description)
 
 		print_section("✅ SEQUENTIAL DEMO COMPLETE")
@@ -353,7 +384,7 @@ def run_sequential_demo():
 
 
 def run_independent_demos():
-	"""Run each scenario independently with hardcoded data"""
+	"""Run each scenario independently with user input"""
 	print("""
 	╔════════════════════════════════════════════════════════════════════════════╗
 	║                                                                            ║
@@ -363,11 +394,47 @@ def run_independent_demos():
 	╚════════════════════════════════════════════════════════════════════════════╝
 	""")
 
-	product_description = (
-		"Janus is an AI-powered GTM Operating System for technical founders. "
-		"Automates marketing strategy, content creation, and optimization."
-	)
-	gtm_goals = "Launch and get 100 users in 4 weeks via X and ProductHunt"
+	# Get user input for product info
+	print("\n📝 Please provide your product information:\n")
+
+	print("Enter your product description:")
+	print("(Press Enter twice when done, or leave blank for default example)\n")
+
+	lines = []
+	while True:
+		line = input()
+		if line == "":
+			if len(lines) > 0 and lines[-1] == "":
+				lines.pop()  # Remove the last empty line
+				break
+			lines.append(line)
+			if len(lines) == 1:  # First empty line
+				break
+		else:
+			lines.append(line)
+
+	product_description = " ".join(lines).strip()
+
+	# Use default if empty
+	if not product_description:
+		product_description = (
+			"Janus is an AI-powered GTM Operating System for technical founders. "
+			"Automates marketing strategy, content creation, and optimization."
+		)
+		print("Using default product description.")
+
+	print("\nEnter your GTM goals:")
+	print("(Or press Enter for default example)\n")
+	gtm_goals = input().strip()
+
+	if not gtm_goals:
+		gtm_goals = "Launch and get 100 users in 4 weeks via X and ProductHunt"
+		print("Using default GTM goals.")
+
+	print("\n" + "=" * 80)
+	print("Product:", product_description[:80] + ("..." if len(product_description) > 80 else ""))
+	print("Goal:", gtm_goals)
+	print("=" * 80)
 
 	try:
 		# Independent Scenario 1
