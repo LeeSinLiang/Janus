@@ -67,7 +67,7 @@ class Post(models.Model):
 		('Phase 3', 'Phase 3'),
 	]
 
-	post_id = models.CharField(max_length=255)
+	post_id = models.CharField(max_length=255, blank=False, null=True)
 	campaign = models.ForeignKey(
 		Campaign,
 		on_delete=models.CASCADE,
