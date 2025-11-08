@@ -46,12 +46,15 @@ def createXPost(request):
 		return Response({"error": "Missing 'pk' field"}, status=400)
 
 	post = Post.objects.get(pk=pk)
-	if post.selected_variant == None:
-		variantId = "A"
+
+	
+	if post.selected_variant:
+		variant = ContentVariant.objects.filter(variant_id=post.selected_variant, post=post).first()
+		text = variant.content if variant else post.description
 	else:
-		variantId = post.selected_variant
-	selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=post)
-	text = selectedVariant.content
+		
+		variant = ContentVariant.objects.filter(variant_id="A", post=post).first()
+		text = variant.content if variant else post.description
 
 	# Use clone API instead of real Twitter API
 	url = f"http://localhost:8000/clone/2/tweets"
