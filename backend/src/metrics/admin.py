@@ -3,6 +3,6 @@ from .models import NodeMetrics
 
 # Register your models here.
 class MemberAdmin(admin.ModelAdmin):
-    list_display = ('node_id', 'likes', 'impressions', 'retweets')
+    list_display = ('pk', 'likes', 'impressions', 'retweets')
 
 admin.site.register(NodeMetrics, MemberAdmin)

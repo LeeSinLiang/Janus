@@ -2,6 +2,8 @@ from django.db import models
 from django.core.serializers.json import DjangoJSONEncoder
 import json
 
+from metrics.models import PostMetrics
+
 
 class Campaign(models.Model):
 	"""Marketing campaign with phases, strategy, and posts"""
@@ -78,8 +80,7 @@ class Post(models.Model):
 	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
 	selected_variant = models.CharField(max_length=10, blank=True, null=True)
 
-	# Store metrics as JSON
-	metrics = models.JSONField(default=dict, blank=True)
+	metrics = models.ForeignKey(PostMetrics, on_delete=models.SET_NULL, null=True, blank=True)
 
 	# Many-to-many relationship to track post dependencies
 	next_posts = models.ManyToManyField(
@@ -102,6 +103,18 @@ class Post(models.Model):
 
 	def __str__(self):
 		return f"Post {self.post_id} - {self.campaign.name}"
+
+	# create metrics object when create new post
+	def save(self, *args, **kwargs):
+		if not self.metrics:
+			metrics = PostMetrics.objects.create(
+				post=self,
+				likes=0,
+				impressions=0,
+				retweets=0,
+			)
+			self.metrics = metrics
+		super().save(*args, **kwargs)
 
 
 class ContentVariant(models.Model):
@@ -208,3 +221,39 @@ class ConversationMessage(models.Model):
 
 	def __str__(self):
 		return f"{self.role}: {self.content[:50]}..."
+
+
+if __name__ == "__main__":
+	# Simple test to create a campaign and a post
+	campaign = Campaign.objects.create(
+		campaign_id="camp_001",
+		name="Summer Sale",
+		description="Campaign for summer sale promotion."
+	)
+
+	post = Post.objects.create(
+		post_id="post_001",
+		campaign=campaign,
+		phase="content_creation"
+	)
+
+	variant_a = ContentVariant.objects.create(
+		variant_id="A",
+		post=post,
+		content="Check out our summer sale! #SummerSale",
+		platform="X"
+	)
+
+	variant_b = ContentVariant.objects.create(
+		variant_id="B",
+		post=post,
+		content="Don't miss our hot summer deals! #HotDeals",
+		platform="X"
+	)
+
+	node_id = post.pk
+	tweet_id = post.metrics.tweet_id
+	print(f"Created campaign: {campaign}")
+	print(f"Created post: {post}")
+	print(f"Created variant A: {variant_a}")
+	print(f"Created variant B: {variant_b}")

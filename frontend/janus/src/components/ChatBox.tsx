@@ -3,16 +3,36 @@
 import { useState, useRef, useEffect } from 'react';
 import { Node } from '@xyflow/react';
 
-interface ChatBoxProps {
-  nodes: Node[];
+interface RejectionState {
+  nodeId: string;
+  nodeName: string;
 }
 
-export default function ChatBox({ nodes }: ChatBoxProps) {
+interface ChatBoxProps {
+  nodes: Node[];
+  rejectionState?: RejectionState | null;
+  onRejectionSubmit?: (rejectMessage: string) => void;
+  onCancelRejection?: () => void;
+}
+
+export default function ChatBox({
+  nodes,
+  rejectionState,
+  onRejectionSubmit,
+  onCancelRejection
+}: ChatBoxProps) {
   const [message, setMessage] = useState('');
   const [showMentionMenu, setShowMentionMenu] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mentionPosition, setMentionPosition] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-focus textarea when rejection mode is activated
+  useEffect(() => {
+    if (rejectionState && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [rejectionState]);
 
   // Extract node titles for the mention menu
   const nodeOptions = nodes.map((node) => ({
@@ -48,19 +68,47 @@ export default function ChatBox({ nodes }: ChatBoxProps) {
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!showMentionMenu) return;
+    if (showMentionMenu) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % nodeOptions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + nodeOptions.length) % nodeOptions.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        selectNode(nodeOptions[selectedIndex]);
+      } else if (e.key === 'Escape') {
+        setShowMentionMenu(false);
+      }
+      return;
+    }
 
-    if (e.key === 'ArrowDown') {
+    // Handle Enter key for message submission
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % nodeOptions.length);
-    } else if (e.key === 'ArrowUp') {
+      handleSubmit();
+    }
+
+    // Handle Escape key to cancel rejection mode
+    if (e.key === 'Escape' && rejectionState) {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + nodeOptions.length) % nodeOptions.length);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      selectNode(nodeOptions[selectedIndex]);
-    } else if (e.key === 'Escape') {
-      setShowMentionMenu(false);
+      onCancelRejection?.();
+    }
+  };
+
+  // Handle message submission
+  const handleSubmit = () => {
+    if (!message.trim()) return;
+
+    if (rejectionState) {
+      // In rejection mode - submit rejection
+      onRejectionSubmit?.(message.trim());
+      setMessage('');
+    } else {
+      // Normal message mode - handle normally (you can implement this later)
+      console.log('Normal message submitted:', message);
+      setMessage('');
     }
   };
 
@@ -96,20 +144,59 @@ export default function ChatBox({ nodes }: ChatBoxProps) {
   return (
     <div className="w-full px-6 py-4">
       <div className="mx-auto">
+        {/* Rejection mode banner */}
+        {rejectionState && (
+          <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm font-semibold text-red-900">
+                  Rejecting node: {rejectionState.nodeName}
+                </span>
+                <p className="mt-1 text-xs text-red-700">
+                  Please explain why you're rejecting this node
+                </p>
+              </div>
+              <button
+                onClick={onCancelRejection}
+                className="text-red-600 hover:text-red-800 transition-colors"
+                title="Cancel rejection"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Current prompt display */}
-        <div className="mb-3">
-          <span className="text-base font-semibold text-orange-500">Janus:</span>
-          <span className="ml-2 text-sm text-zinc-700">
-            Create an Instagram carousel post (5 slides) highlighting our top features.
-          </span>
-        </div>
+        {!rejectionState && (
+          <div className="mb-3">
+            <span className="text-base font-semibold text-orange-500">Janus:</span>
+            <span className="ml-2 text-sm text-zinc-700">
+              Create an Instagram carousel post (5 slides) highlighting our top features.
+            </span>
+          </div>
+        )}
 
         {/* Context button */}
-        <div className="mb-2">
-          <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
-            @ add context
-          </button>
-        </div>
+        {!rejectionState && (
+          <div className="mb-2">
+            <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
+              @ add context
+            </button>
+          </div>
+        )}
 
         {/* Input area */}
         <div className="relative">
@@ -118,9 +205,13 @@ export default function ChatBox({ nodes }: ChatBoxProps) {
             value={message}
             onChange={handleMessageChange}
             onKeyDown={handleKeyDown}
-            placeholder="Write your message ..."
-            className="w-full resize-none rounded-lg border border-zinc-200 bg-white px-3 py-2 pr-32 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-300"
-            rows={1}
+            placeholder={rejectionState ? "Explain why you're rejecting this node..." : "Write your message ..."}
+            className={`w-full resize-none rounded-lg border px-3 py-2 pr-32 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-1 ${
+              rejectionState
+                ? 'border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-400'
+                : 'border-zinc-200 bg-white focus:border-zinc-300 focus:ring-zinc-300'
+            }`}
+            rows={rejectionState ? 3 : 1}
           />
 
           {/* Mention Menu */}
@@ -239,7 +330,15 @@ export default function ChatBox({ nodes }: ChatBoxProps) {
               </button>
 
               {/* Send button */}
-              <button className="rounded-lg bg-zinc-900 p-1.5 text-white transition-colors hover:bg-zinc-700">
+              <button
+                onClick={handleSubmit}
+                className={`rounded-lg p-1.5 text-white transition-colors ${
+                  rejectionState
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-zinc-900 hover:bg-zinc-700'
+                }`}
+                title={rejectionState ? 'Submit rejection' : 'Send message'}
+              >
                 <svg
                   width="18"
                   height="18"
