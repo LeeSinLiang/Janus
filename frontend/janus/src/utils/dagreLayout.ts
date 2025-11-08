@@ -24,6 +24,7 @@ const DEFAULT_OPTIONS: Required<LayoutOptions> = {
 /**
  * Apply dagre layout algorithm to nodes and edges
  * Groups nodes by phase and creates hierarchical flow
+ * Enforces strict phase-based column positioning
  *
  * Performance: O(n + e) where n=nodes, e=edges
  * Only runs once on initial load or when explicitly called
@@ -35,61 +36,74 @@ export function applyDagreLayout(
 ): Node[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
-  // Create dagre graph
-  const dagreGraph = new dagre.graphlib.Graph();
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
+  // Define strict X positions for each phase column
+  const PHASE_X_POSITIONS = {
+    1: 200,   // Phase 1: Left column
+    2: 750,   // Phase 2: Middle column
+    3: 1300,  // Phase 3: Right column
+  };
 
-  // Configure graph layout
-  dagreGraph.setGraph({
-    rankdir: opts.direction,
-    nodesep: opts.verticalSpacing,
-    ranksep: opts.horizontalSpacing,
-    ranker: 'tight-tree', // Minimize edge crossings
-  });
-
-  // Group nodes by phase for better layout
-  const nodesByPhase = new Map<string, Node[]>();
+  // Group nodes by phase for layout
+  const nodesByPhase = new Map<number, Node[]>();
   nodes.forEach(node => {
-    const phase = String(node.data?.phase || 'Phase 1');
-    if (!nodesByPhase.has(phase)) {
-      nodesByPhase.set(phase, []);
-    }
-    nodesByPhase.get(phase)!.push(node);
-  });
-
-  // Add nodes to dagre graph with phase-based ranking hint
-  nodes.forEach((node) => {
     const phase = String(node.data?.phase || 'Phase 1');
     const phaseNumber = extractPhaseNumber(phase);
 
-    dagreGraph.setNode(node.id, {
-      width: opts.nodeWidth,
-      height: opts.nodeHeight,
-      // Hint to dagre: Phase 1 should be leftmost, Phase 3 rightmost
-      rank: phaseNumber,
+    if (!nodesByPhase.has(phaseNumber)) {
+      nodesByPhase.set(phaseNumber, []);
+    }
+    nodesByPhase.get(phaseNumber)!.push(node);
+  });
+
+  // Layout each phase column separately using dagre
+  const layoutedNodes: Node[] = [];
+
+  [1, 2, 3].forEach(phaseNumber => {
+    const phaseNodes = nodesByPhase.get(phaseNumber) || [];
+    if (phaseNodes.length === 0) return;
+
+    // Create separate dagre graph for this phase
+    const phaseGraph = new dagre.graphlib.Graph();
+    phaseGraph.setDefaultEdgeLabel(() => ({}));
+
+    phaseGraph.setGraph({
+      rankdir: 'TB', // Top-to-Bottom within each phase column
+      nodesep: opts.verticalSpacing,
+      ranksep: 80, // Tighter vertical spacing within phase
     });
-  });
 
-  // Add edges to dagre graph
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
+    // Add nodes from this phase
+    phaseNodes.forEach(node => {
+      phaseGraph.setNode(node.id, {
+        width: opts.nodeWidth,
+        height: opts.nodeHeight,
+      });
+    });
 
-  // Run dagre layout algorithm
-  dagre.layout(dagreGraph);
+    // Add edges that connect nodes within this phase
+    edges.forEach(edge => {
+      const sourceInPhase = phaseNodes.some(n => n.id === edge.source);
+      const targetInPhase = phaseNodes.some(n => n.id === edge.target);
+      if (sourceInPhase && targetInPhase) {
+        phaseGraph.setEdge(edge.source, edge.target);
+      }
+    });
 
-  // Apply calculated positions to nodes
-  const layoutedNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
+    // Run dagre layout for this phase
+    dagre.layout(phaseGraph);
 
-    return {
-      ...node,
-      position: {
-        // Center the node on the calculated position
-        x: nodeWithPosition.x - opts.nodeWidth / 2,
-        y: nodeWithPosition.y - opts.nodeHeight / 2,
-      },
-    };
+    // Apply positions with strict X coordinate
+    phaseNodes.forEach(node => {
+      const nodeWithPosition = phaseGraph.node(node.id);
+
+      layoutedNodes.push({
+        ...node,
+        position: {
+          x: PHASE_X_POSITIONS[phaseNumber as keyof typeof PHASE_X_POSITIONS] - opts.nodeWidth / 2,
+          y: nodeWithPosition.y - opts.nodeHeight / 2,
+        },
+      });
+    });
   });
 
   return layoutedNodes;

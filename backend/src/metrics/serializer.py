@@ -1,6 +1,8 @@
 from rest_framework import serializers
-from .models import PostMetrics
+from .models import PostMetrics, IGMetrics
 from agents.models import Post
+from .models import PostMetrics
+from agents.models import Post, ContentVariant
 
 class PostMetricsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -11,3 +13,14 @@ class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ('pk', 'title', 'description', 'next_posts', 'phase')
+
+
+class IGMetricsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IGMetrics
+        fields = '__all__'
+
+class ContentVariantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContentVariant
+        fields = ('variant_id', 'content', 'platform', 'metadata')

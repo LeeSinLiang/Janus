@@ -98,16 +98,16 @@ export async function fetchGraphData(): Promise<GraphResponse> {
 }
 
 /**
- * Approve a node - sends POST request with node name
+ * Approve a node - sends POST request with node pk
  */
-export async function approveNode(nodeName: string): Promise<void> {
+export async function approveNode(nodePk: string): Promise<void> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/approve`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ node_name: nodeName }),
+      body: JSON.stringify({ pk: nodePk }),
     });
 
     if (!response.ok) {
@@ -120,9 +120,9 @@ export async function approveNode(nodeName: string): Promise<void> {
 }
 
 /**
- * Reject a node - sends POST request with node name and rejection message
+ * Reject a node - sends POST request with node pk and rejection message
  */
-export async function rejectNode(nodeName: string, rejectMessage: string): Promise<void> {
+export async function rejectNode(nodePk: string, rejectMessage: string): Promise<void> {
   try {
     const response = await fetch(`${API_BASE_URL}${GRAPH_ENDPOINT}`, {
       method: 'POST',
@@ -130,7 +130,7 @@ export async function rejectNode(nodeName: string, rejectMessage: string): Promi
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        node_name: nodeName,
+        pk: nodePk,
         reject_message: rejectMessage
       }),
     });
