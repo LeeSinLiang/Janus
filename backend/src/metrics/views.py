@@ -130,6 +130,36 @@ def getVariants(request):
         return Response({"error": f"Post with pk={pk} not found"}, status=404)
 
 @api_view(['POST'])
+def selectVariant(request):
+    """Save selected variant for a post"""
+    pk = request.data.get("pk")
+    variant_id = request.data.get("variant_id")
+
+    if not pk or not variant_id:
+        return Response({"error": "Missing 'pk' or 'variant_id' field"}, status=400)
+
+    try:
+        post = Post.objects.get(pk=pk)
+        # Verify the variant exists
+        variant = post.variants.filter(variant_id=variant_id).first()
+
+        if not variant:
+            return Response({"error": f"Variant '{variant_id}' not found for post {pk}"}, status=404)
+
+        # Save selected variant
+        post.selected_variant = variant_id
+        post.save()
+
+        return Response({
+            "success": True,
+            "message": f"Variant '{variant_id}' selected for post {pk}",
+            "post_id": post.pk,
+            "selected_variant": variant_id
+        }, status=200)
+    except Post.DoesNotExist:
+        return Response({"error": f"Post with pk={pk} not found"}, status=404)
+
+@api_view(['POST'])
 def approveNode(request):
     """Approve a pending node"""
     pk = request.data.get("pk")

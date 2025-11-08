@@ -145,6 +145,52 @@ export async function rejectNode(nodePk: string, rejectMessage: string): Promise
 }
 
 /**
+ * Fetch content variants for a post by pk
+ */
+export async function fetchVariants(pk: string): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/getVariants/?pk=${pk}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch variants: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching variants:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save selected variant for a post
+ */
+export async function selectVariant(pk: string, variantId: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/selectVariant/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pk, variant_id: variantId }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to select variant: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error selecting variant:', error);
+    throw error;
+  }
+}
+
+/**
  * Mock function for development/testing
  * Remove this when connecting to real backend
  */

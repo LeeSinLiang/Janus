@@ -25,7 +25,7 @@ import WelcomeBar from './WelcomeBar';
 import EngagementLineChart from './EngagementLineChart';
 import EngagementPieChart from './EngagementPieChart';
 import { useGraphData } from '@/hooks/useGraphData';
-import { approveNode, rejectNode } from '@/services/api';
+import { approveNode, rejectNode, fetchVariants, selectVariant } from '@/services/api';
 import { Node as FlowNode } from '@xyflow/react';
 
 const nodeTypes = {
@@ -46,6 +46,7 @@ export default function CanvasWithPolling() {
 
   // Modal state for viewing node variants
   const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
+  const [variants, setVariants] = useState<any>(null);
 
   // Phase state
   const [activePhase, setActivePhase] = useState(1); // 0-indexed, so 1 = Phase 2
@@ -140,43 +141,72 @@ export default function CanvasWithPolling() {
     setRejectionState(null);
   }, []);
 
-  // Handle node click to show variants
-  const handleNodeClick = useCallback((node: FlowNode) => {
-    // Only show modal if the node has variants
-    if (node.data?.variant1 && node.data?.variant2) {
-      setSelectedNode(node);
+  // Handle node click to fetch and show variants
+  const handleNodeClick = useCallback(async (node: FlowNode) => {
+    try {
+      // Fetch variants from backend
+      const data = await fetchVariants(node.id);
+
+      if (data.variants && data.variants.length >= 2) {
+        setVariants(data.variants);
+        setSelectedNode(node);
+      }
+    } catch (error) {
+      console.error('Failed to fetch variants:', error);
     }
   }, []);
 
   // Handle variant selection
-  const handleSelectVariant = useCallback((variantNumber: 1 | 2) => {
-    if (!selectedNode) return;
+  const handleSelectVariant = useCallback(async (variantNumber: 1 | 2) => {
+    if (!selectedNode || !variants) return;
 
-    // Update the node with the selected variant
-    const selectedVariant = variantNumber === 1
-      ? (selectedNode.data.variant1 as { title: string; description: string } | undefined)
-      : (selectedNode.data.variant2 as { title: string; description: string } | undefined);
+    // Get the selected variant from fetched data
+    const selectedVariant = variants[variantNumber - 1];
 
     if (selectedVariant) {
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === selectedNode.id
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  title: selectedVariant.title,
-                  description: selectedVariant.description,
-                },
-              }
-            : node
-        )
-      );
+      try {
+        // Save selection to backend
+        await selectVariant(selectedNode.id, selectedVariant.variant_id);
+
+        // Update the node's description with the selected variant content (instant feedback)
+        setNodes((nds) =>
+          nds.map((node) =>
+            node.id === selectedNode.id
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    description: selectedVariant.content,
+                    selectedVariantId: selectedVariant.variant_id,
+                  },
+                }
+              : node
+          )
+        );
+      } catch (error) {
+        console.error('Failed to save variant selection:', error);
+        // Still update UI for instant feedback even if backend fails
+        setNodes((nds) =>
+          nds.map((node) =>
+            node.id === selectedNode.id
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    description: selectedVariant.content,
+                    selectedVariantId: selectedVariant.variant_id,
+                  },
+                }
+              : node
+          )
+        );
+      }
     }
 
-    // Close modal
+    // Close modal and clear variants
     setSelectedNode(null);
-  }, [selectedNode, setNodes]);
+    setVariants(null);
+  }, [selectedNode, variants, setNodes]);
 
   // Add handlers to node data
   const nodesWithHandlers = nodes.map((node) => ({
@@ -238,33 +268,18 @@ export default function CanvasWithPolling() {
     );
   }
 
-  // Prepare variant modal data
-  const variantModalData = selectedNode && selectedNode.data?.variant1 && selectedNode.data?.variant2 ? {
-    variant1: selectedNode.data.variant1 as { title: string; description: string },
-    variant2: selectedNode.data.variant2 as { title: string; description: string },
-    icon: selectedNode.data.icon as string | undefined,
-    iconBg: selectedNode.data.iconBg as string | undefined,
-  } : null;
-
   return (
     <div className="relative h-full w-full bg-gray-50">
       {/* Node Variant Modal */}
-      {variantModalData && (
+      {selectedNode && variants && variants.length >= 2 && (
         <NodeVariantModal
           isOpen={!!selectedNode}
-          onClose={() => setSelectedNode(null)}
-          variant1={{
-            title: variantModalData.variant1.title,
-            description: variantModalData.variant1.description,
-            icon: variantModalData.icon,
-            iconBg: variantModalData.iconBg,
+          onClose={() => {
+            setSelectedNode(null);
+            setVariants(null);
           }}
-          variant2={{
-            title: variantModalData.variant2.title,
-            description: variantModalData.variant2.description,
-            icon: variantModalData.icon,
-            iconBg: variantModalData.iconBg,
-          }}
+          variant1={variants[0]}
+          variant2={variants[1]}
           onSelectVariant={handleSelectVariant}
         />
       )}
