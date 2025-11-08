@@ -127,7 +127,7 @@ def getVariants(request):
 
 @api_view(['POST'])
 def selectVariant(request):
-	"""Save selected variant for a post"""
+	"""Save selected variant for a post and update post description"""
 	pk = request.data.get("pk")
 	variant_id = request.data.get("variant_id")
 
@@ -142,15 +142,17 @@ def selectVariant(request):
 		if not variant:
 			return Response({"error": f"Variant '{variant_id}' not found for post {pk}"}, status=404)
 
-		# Save selected variant
+		# Save selected variant and update post description with variant content
 		post.selected_variant = variant_id
+		post.description = variant.content
 		post.save()
 
 		return Response({
 			"success": True,
 			"message": f"Variant '{variant_id}' selected for post {pk}",
 			"post_id": post.pk,
-			"selected_variant": variant_id
+			"selected_variant": variant_id,
+			"updated_description": variant.content
 		}, status=200)
 	except Post.DoesNotExist:
 		return Response({"error": f"Post with pk={pk} not found"}, status=404)
