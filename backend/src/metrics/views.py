@@ -58,23 +58,40 @@ def createXPost(request):
 
     return Response(resp.json(), status=resp.status_code)
     
-@api_view(['GET'])
-def getXPostMetrics(request, tweet_id):
-    access_token = settings.X_ACCESS_TOKEN
+@api_view(['POST'])
+def getXPostMetrics(request):
+    pk = request.data.get("pk")
+    if not pk:
+        return Response({"error": "Missing 'pk' field"}, status=400)
+    
+    post = Post.objects.get(pk=pk)
+    postMetrics = post.metrics
+    tweet_id = postMetrics.tweet_id
+
     url = f"https://api.x.com/2/tweets"
     headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {settings.X_USER_BEARER_TOKEN}",  # <- user-context token
+        "Content-Type": "application/json",
     }
     params = {
         "ids": tweet_id,
         "tweet.fields": "public_metrics,non_public_metrics"
     }
+    
     resp = requests.get(url, headers=headers, params=params)
+    data = resp.json()
+
     if resp.status_code == 200:
-        return Response(resp.json(), status=200)
-    else:
-        return Response({"error": resp.json()}, status=resp.status_code)
+        d = data["data"][0]
+        pub = d.get("public_metrics", {})
+        nonpub = d.get("non_public_metrics", {})
+        PostMetrics.objects.filter(tweet_id=tweet_id).update(
+            likes=pub.get("like_count", 0),
+            retweets=pub.get("retweet_count", 0),
+            impressions=nonpub.get("impression_count", 0),
+        )
+        return Response(data, status=200)
+    return Response({"error": data}, status=resp.status_code)
 
 @api_view(['GET'])
 def metricsJSON(request):
