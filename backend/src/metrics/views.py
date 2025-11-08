@@ -46,10 +46,25 @@ def createXPost(request):
 	if not pk:
 		return Response({"error": "Missing 'pk' field"}, status=400)
 
-	post = Post.objects.get(pk=pk)
+	try:
+		post = Post.objects.get(pk=pk)
+	except Post.DoesNotExist:
+		return Response({"error": f"Post with pk={pk} not found"}, status=404)
+
+	# Determine content to post
 	variantId = post.selected_variant
-	selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=post)
-	text = selectedVariant.content
+	if variantId:
+		# Use selected variant if it exists
+		try:
+			selectedVariant = ContentVariant.objects.get(variant_id=variantId, post=post)
+			text = selectedVariant.content
+		except ContentVariant.DoesNotExist:
+			return Response({"error": f"Selected variant '{variantId}' not found"}, status=404)
+	else:
+		# Fallback to post description if no variant selected
+		text = post.description
+		if not text:
+			return Response({"error": "No content available to post (no variant or description)"}, status=400)
 
 	# Use clone API instead of real Twitter API
 	url = f"http://localhost:8000/clone/2/tweets"
@@ -65,9 +80,10 @@ def createXPost(request):
 		tweet_id = (data.get("data")).get("id")
 		if tweet_id:
 			postMetrics = post.metrics
-			postMetrics.tweet_id = tweet_id
+			if postMetrics:
+				postMetrics.tweet_id = tweet_id
+				postMetrics.save()
 			post.status = "published"
-			postMetrics.save()
 			post.save()
 
 	return Response(resp.json(), status=resp.status_code)
