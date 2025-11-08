@@ -67,9 +67,9 @@ export function applyDagreLayout(
     phaseGraph.setDefaultEdgeLabel(() => ({}));
 
     phaseGraph.setGraph({
-      rankdir: 'LR', // Left-to-Right for better horizontal distribution
-      nodesep: opts.horizontalSpacing / 2, // Horizontal spacing between nodes
-      ranksep: opts.verticalSpacing, // Vertical spacing between ranks
+      rankdir: 'TB', // Top-to-Bottom for vertical stacking in each phase column
+      nodesep: 50, // Minimal horizontal separation (we want them vertically aligned)
+      ranksep: opts.verticalSpacing, // Vertical spacing between nodes
     });
 
     // Add nodes from this phase
@@ -92,23 +92,18 @@ export function applyDagreLayout(
     // Run dagre layout for this phase
     dagre.layout(phaseGraph);
 
-    // Calculate the centroid X position of all nodes in this phase
-    // This helps us center the phase layout around the target X position
-    const phaseNodePositions = phaseNodes.map(node => phaseGraph.node(node.id));
-    const avgX = phaseNodePositions.reduce((sum, pos) => sum + pos.x, 0) / phaseNodePositions.length;
+    // Get the target X position for this phase
     const targetPhaseX = PHASE_X_POSITIONS[phaseNumber as keyof typeof PHASE_X_POSITIONS];
-    const xOffset = targetPhaseX - avgX;
 
-    // Apply positions - center phase layout around phase column position
-    phaseNodes.forEach(node => {
-      const nodeWithPosition = phaseGraph.node(node.id);
-
+    // Apply positions - fixed X for vertical alignment, manual Y for stacking
+    phaseNodes.forEach((node, index) => {
       layoutedNodes.push({
         ...node,
         position: {
-          // Center the dagre layout around the phase column X position
-          x: nodeWithPosition.x + xOffset - opts.nodeWidth / 2,
-          y: nodeWithPosition.y - opts.nodeHeight / 2,
+          // Fixed X position for the phase column (all nodes vertically aligned)
+          x: targetPhaseX - opts.nodeWidth / 2,
+          // Stack nodes vertically with spacing
+          y: 50 + (index * (opts.nodeHeight + opts.verticalSpacing)),
         },
       });
     });
