@@ -227,8 +227,9 @@ function convertEdgesToReactFlow(parsedEdges: ParsedEdge[]): Edge[] {
         id: `e${index}-forward`,
         source: edge.source,
         target: edge.target,
-        type: 'smoothstep',
-        animated: false,
+        markerEnd: 'arrow',
+        type: 'default',
+        
         style: { stroke: '#94A3B8', strokeWidth: 2 },
       });
 
@@ -237,8 +238,9 @@ function convertEdgesToReactFlow(parsedEdges: ParsedEdge[]): Edge[] {
         id: `e${index}-backward`,
         source: edge.target,
         target: edge.source,
-        type: 'smoothstep',
-        animated: false,
+        markerEnd: 'arrow',
+        type: 'default',
+        
         style: { stroke: '#94A3B8', strokeWidth: 2, strokeDasharray: '5,5' },
       });
     } else {
@@ -247,8 +249,9 @@ function convertEdgesToReactFlow(parsedEdges: ParsedEdge[]): Edge[] {
         id: `e${index}`,
         source: edge.source,
         target: edge.target,
-        type: 'smoothstep',
-        animated: false,
+        markerEnd: 'arrow',
+        type: 'default',
+        
         style: { stroke: '#94A3B8', strokeWidth: 2 },
       });
     }

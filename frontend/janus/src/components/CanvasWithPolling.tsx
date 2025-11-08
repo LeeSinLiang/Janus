@@ -19,14 +19,23 @@ import TaskCardNode from './TaskCardNode';
 import ChatBox from './ChatBox';
 import ViewToggle from './ViewToggle';
 import { useGraphData } from '@/hooks/useGraphData';
+import { approveNode, rejectNode } from '@/services/api';
 
 const nodeTypes = {
   taskCard: TaskCardNode,
 };
 
+interface RejectionState {
+  nodeId: string;
+  nodeName: string;
+}
+
 export default function CanvasWithPolling() {
   // View state
   const [activeView, setActiveView] = useState<'node-editor' | 'chart'>('node-editor');
+
+  // Rejection flow state
+  const [rejectionState, setRejectionState] = useState<RejectionState | null>(null);
 
   // Fetch graph data with automatic polling and diff-based updates
   // The hook now handles all diffing internally and preserves positions
@@ -37,37 +46,84 @@ export default function CanvasWithPolling() {
 
   // Approve a pending node
   const handleApproveNode = useCallback(
-    (nodeId: string) => {
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  pendingApproval: false, // Remove pending state
-                },
-              }
-            : node
-        )
-      );
+    async (nodeId: string) => {
+      // Find the node to get its name
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) return;
+
+      const nodeName = String(node.data?.title || nodeId);
+
+      try {
+        // Send approval to backend
+        await approveNode(nodeName);
+
+        // Update UI - remove pending state
+        setNodes((nds) =>
+          nds.map((node) =>
+            node.id === nodeId
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    pendingApproval: false,
+                  },
+                }
+              : node
+          )
+        );
+      } catch (error) {
+        console.error('Failed to approve node:', error);
+        // Optionally show error to user
+      }
     },
-    [setNodes]
+    [nodes, setNodes]
   );
 
-  // Reject a pending node (remove it and its connected edges)
+  // Initiate rejection flow - set state to trigger ChatBox focus
   const handleRejectNode = useCallback(
     (nodeId: string) => {
-      // Remove the node
-      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) return;
 
-      // Remove all edges connected to this node
-      setEdges((eds) =>
-        eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
-      );
+      const nodeName = String(node.data?.title || nodeId);
+
+      // Set rejection state - this will trigger ChatBox to focus
+      setRejectionState({ nodeId, nodeName });
     },
-    [setNodes, setEdges]
+    [nodes]
   );
+
+  // Handle rejection submission from ChatBox
+  const handleRejectionSubmit = useCallback(
+    async (rejectMessage: string) => {
+      if (!rejectionState) return;
+
+      try {
+        // Send rejection to backend
+        await rejectNode(rejectionState.nodeName, rejectMessage);
+
+        // Remove the node from UI
+        setNodes((nds) => nds.filter((node) => node.id !== rejectionState.nodeId));
+
+        // Remove all edges connected to this node
+        setEdges((eds) =>
+          eds.filter((edge) => edge.source !== rejectionState.nodeId && edge.target !== rejectionState.nodeId)
+        );
+
+        // Clear rejection state
+        setRejectionState(null);
+      } catch (error) {
+        console.error('Failed to reject node:', error);
+        // Optionally show error to user
+      }
+    },
+    [rejectionState, setNodes, setEdges]
+  );
+
+  // Cancel rejection flow
+  const handleCancelRejection = useCallback(() => {
+    setRejectionState(null);
+  }, []);
 
   // Add handlers to node data
   const nodesWithHandlers = nodes.map((node) => ({
@@ -100,7 +156,9 @@ export default function CanvasWithPolling() {
     (params: Edge | Connection) => {
       const newEdge = {
         ...params,
-        type: 'smoothstep',
+        type: 'default',
+        markerEnd: 'arrow',
+         animated: true,
         style: { stroke: '#94A3B8', strokeWidth: 2 },
       };
       setEdges((eds) => addEdge(newEdge as Edge, eds));
@@ -145,7 +203,7 @@ export default function CanvasWithPolling() {
             onConnect={onConnect}
             nodeTypes={nodeTypes}
             fitView
-            fitViewOptions={{ padding: 0.2 }}
+            fitViewOptions={{ padding: {left: 0.3, top: 0.3, right: 0.3, bottom: 1.5} }}
           >
             <Controls />
             <Background color="#e5e7eb" variant={BackgroundVariant.Dots} gap={16} size={4} />
@@ -154,7 +212,12 @@ export default function CanvasWithPolling() {
           {/* Floating ChatBox at the bottom */}
           <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
             <div className="pointer-events-auto w-full max-w-[50%] rounded-xl border border-zinc-200 bg-white shadow-lg">
-              <ChatBox nodes={nodesWithHandlers} />
+              <ChatBox
+                nodes={nodesWithHandlers}
+                rejectionState={rejectionState}
+                onRejectionSubmit={handleRejectionSubmit}
+                onCancelRejection={handleCancelRejection}
+              />
             </div>
           </div>
         </>

@@ -97,20 +97,20 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
                   diff
                 );
 
-                // Update edges state
+                // Update nodes state from within setEdges
                 if (isMountedRef.current) {
-                  setEdges(updatedEdges);
+                  setNodes(updatedNodes);
                 }
 
-                // Return updated nodes
-                return updatedNodes;
+                // Return updated edges (this is what setEdges expects)
+                return updatedEdges;
               } else {
                 console.log('Diff found no actual changes');
-                return currentNodes;
+                return currentEdges;
               }
             });
 
-            // This return is needed for the outer setNodes
+            // Return current nodes (unchanged since we update inside setEdges)
             return currentNodes;
           });
 
