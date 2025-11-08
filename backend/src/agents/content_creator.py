@@ -8,7 +8,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
-import os
 
 
 # =====================
@@ -88,26 +87,26 @@ RULES:
 
 OUTPUT FORMAT:
 Return a JSON object with this exact structure:
-{
+{{
   "topic": "brief description of the topic",
   "variants": [
-    {
+    {{
       "variant_id": "A",
       "content": "the tweet text (max 280 chars)",
       "hook": "the angle/hook used (e.g., 'pain point', 'social proof', 'curiosity')",
       "reasoning": "why this variant might perform well",
       "hashtags": "suggested hashtags"
-    },
-    {
+    }},
+    {{
       "variant_id": "B",
       "content": "alternative tweet text (max 280 chars)",
       "hook": "different angle/hook",
       "reasoning": "why this variant might perform well",
       "hashtags": "suggested hashtags"
-    }
+    }}
   ],
   "recommendation": "which variant to test first and why"
-}
+}}
 
 IMPORTANT: Ensure ALL content is under 280 characters including hashtags!"""
 
@@ -205,19 +204,13 @@ Feedback/Direction: {feedback}"""
 # Convenience Functions
 # =====================
 
-def create_content_creator(api_key: Optional[str] = None) -> ContentCreatorAgent:
+def create_content_creator() -> ContentCreatorAgent:
     """
     Factory function to create a Content Creator Agent.
-
-    Args:
-        api_key: Google API key (uses GOOGLE_API_KEY env var if not provided)
 
     Returns:
         Initialized ContentCreatorAgent
     """
-    if api_key:
-        os.environ["GOOGLE_API_KEY"] = api_key
-
     return ContentCreatorAgent()
 
 

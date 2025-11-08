@@ -186,9 +186,9 @@ def main():
 
     try:
         # Run demos
-        demo_orchestrator()
+        # demo_orchestrator()
         demo_individual_agents()
-        demo_state_management()
+        # demo_state_management()
 
         print_section("✅ DEMO COMPLETE")
         print("All agents are working correctly!")

@@ -9,8 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
-from .state import state, Campaign, CampaignPhase
-import os
+from .state import state, Campaign
 from datetime import datetime
 import uuid
 
@@ -129,24 +128,24 @@ TARGET AUDIENCE CONSIDERATIONS:
 
 OUTPUT FORMAT:
 Return a JSON object with this structure:
-{
+{{
   "campaign_name": "string",
   "campaign_goal": "string",
   "target_audience": "string",
   "phases": [
-    {
+    {{
       "phase_id": "phase_1",
       "phase_name": "Awareness",
       "duration": "2 weeks",
       "channels": ["X", "ProductHunt"],
       "objectives": ["Build anticipation", "Gather early feedback"],
       "content_themes": ["Problem statement", "Sneak peeks"]
-    }
+    }}
   ],
   "mermaid_diagram": "graph TD\\n    A[Start] --> B[Phase 1]",
   "key_metrics": ["engagement_rate", "follower_growth", "signups"],
   "success_criteria": "string describing success"
-}
+}}
 
 Be strategic, data-driven, and create actionable plans."""
 
@@ -307,7 +306,10 @@ Return ONLY the Mermaid diagram code (starting with 'graph TD')."""
         response = self.model.invoke(request)
 
         # Extract mermaid code from response
-        mermaid_code = response.content if hasattr(response, 'content') else str(response)
+        if hasattr(response, 'content'):
+            mermaid_code = str(response.content)
+        else:
+            mermaid_code = str(response)
 
         return mermaid_code.strip()
 
@@ -385,19 +387,13 @@ Return ONLY the Mermaid diagram code (starting with 'graph TD')."""
 # Convenience Functions
 # =====================
 
-def create_strategy_planner(api_key: Optional[str] = None) -> StrategyPlannerAgent:
+def create_strategy_planner() -> StrategyPlannerAgent:
     """
     Factory function to create a Strategy Planner Agent.
-
-    Args:
-        api_key: Google API key (uses GOOGLE_API_KEY env var if not provided)
 
     Returns:
         Initialized StrategyPlannerAgent
     """
-    if api_key:
-        os.environ["GOOGLE_API_KEY"] = api_key
-
     return StrategyPlannerAgent()
 
 

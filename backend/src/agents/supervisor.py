@@ -3,13 +3,10 @@ Orchestrator/Supervisor Agent
 Coordinates all specialized sub-agents and manages the multi-agent workflow.
 """
 
-import os
 from typing import Dict, Any, List
 from langchain_core.tools import tool
 from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
-
-from debug import debug_print
 from .content_creator import ContentCreatorAgent
 from .x_platform import XPlatformAgent
 from .metrics_analyzer import MetricsAnalyzerAgent
@@ -327,7 +324,6 @@ Be helpful, concise, and always explain your reasoning."""
         state.add_to_conversation("user", user_input)
 
         # Execute the request using correct message format
-        debug_print("GEMINI API KEY", os.environ.get("GOOGLE_API_KEY"))
         result = self.agent.invoke({
             "messages": [{"role": "user", "content": user_input}]
         })
