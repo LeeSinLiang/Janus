@@ -1,7 +1,7 @@
 from rest_framework import serializers
-from .models import NodeMetrics
+from .models import PostMetrics
 
-class NodeMetricsSerializer(serializers.ModelSerializer):
+class PostMetricsSerializer(serializers.ModelSerializer):
     class Meta:
-        model = NodeMetrics
+        model = PostMetrics
         fields = '__all__'
