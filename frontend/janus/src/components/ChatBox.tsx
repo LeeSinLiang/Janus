@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Node } from '@xyflow/react';
-import { sendTrigger, sendMultiNodePrompt } from '@/services/api';
+import { parseTrigger, sendMultiNodePrompt } from '@/services/api';
 
 interface RejectionState {
   nodeId: string;
@@ -49,8 +49,10 @@ export default function ChatBox({
 
   // Command options for / menu
   const commandOptions = [
-    { id: 'like', label: '1 like', value: '1 like' },
-    { id: 'retweet', label: '1 retweet', value: '1 retweet' },
+    { id: 'likes', label: 'Likes threshold', value: 'likes' },
+    { id: 'retweets', label: 'Retweets threshold', value: 'retweets' },
+    { id: 'impressions', label: 'Impressions threshold', value: 'impressions' },
+    { id: 'comments', label: 'Comments threshold', value: 'comments' },
   ];
 
   // Handle @ and / detection
@@ -165,33 +167,58 @@ export default function ChatBox({
         console.error('Failed to send multi-node prompt:', error);
       }
     } else {
-      // Normal message mode - parse for trigger
-      // Extract node title from **Node Title** format
-      const nodeMatch = message.match(/\*\*([^*]+)\*\*/);
-      const nodeTitle = nodeMatch ? nodeMatch[1] : null;
+      // Normal message mode - parse for trigger in format: **NodeTitle** **condition** prompt
+      // Extract all **text** patterns
+      const boldTextMatches = message.match(/\*\*([^*]+)\*\*/g);
 
-      // Extract trigger from **1 like** or **1 retweet** format
-      const triggerMatch = message.match(/\*\*(1 (like|retweet))\*\*/);
-      const triggerText = triggerMatch ? triggerMatch[2] : null;
+      if (boldTextMatches && boldTextMatches.length >= 2) {
+        // Extract node title (first bold text)
+        const nodeTitle = boldTextMatches[0].replace(/\*\*/g, '');
 
-      // If both node and trigger found, send trigger request
-      if (nodeTitle && triggerText) {
-        // Find node pk by title
-        const node = nodeOptions.find(n => n.title === nodeTitle);
-        if (node) {
-          const nodePk = parseInt(node.id);
-          const trigger = triggerText as 'like' | 'retweet';
+        // Extract condition (second bold text)
+        const condition = boldTextMatches[1].replace(/\*\*/g, '');
 
-          try {
-            await sendTrigger(nodePk, trigger);
-            console.log(`Trigger sent: ${trigger} for node ${nodePk}`);
-          } catch (error) {
-            console.error('Failed to send trigger:', error);
+        // Validate condition is one of the allowed values
+        const validConditions: Array<'likes' | 'retweets' | 'impressions' | 'comments'> = [
+          'likes',
+          'retweets',
+          'impressions',
+          'comments',
+        ];
+
+        if (validConditions.includes(condition as any)) {
+          // Find node pk by title
+          const node = nodeOptions.find(n => n.title === nodeTitle);
+
+          if (node) {
+            // Extract prompt (everything after the second **condition**)
+            const promptStartIndex = message.indexOf(boldTextMatches[1]) + boldTextMatches[1].length;
+            const prompt = message.slice(promptStartIndex).trim();
+
+            if (prompt) {
+              const nodePk = parseInt(node.id);
+
+              try {
+                const result = await parseTrigger(
+                  nodePk,
+                  condition as 'likes' | 'retweets' | 'impressions' | 'comments',
+                  prompt
+                );
+                console.log(`Trigger parsed and saved for node ${nodePk}:`, result);
+              } catch (error) {
+                console.error('Failed to parse trigger:', error);
+              }
+            } else {
+              console.log('No prompt provided after condition');
+            }
+          } else {
+            console.log(`Node with title "${nodeTitle}" not found`);
           }
+        } else {
+          console.log(`Invalid condition "${condition}". Must be one of: ${validConditions.join(', ')}`);
         }
       }
 
-      console.log('Sin is so corny bhai macha:', message);
       setMessage('');
     }
   };

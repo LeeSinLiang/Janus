@@ -67,6 +67,19 @@ class Post(models.Model):
 		('Phase 3', 'Phase 3'),
 	]
 
+	TRIGGER_CONDITION_CHOICES = [
+		('likes', 'Likes'),
+		('retweets', 'Retweets'),
+		('impressions', 'Impressions'),
+		('comments', 'Comments'),
+	]
+
+	TRIGGER_COMPARISON_CHOICES = [
+		('<', 'Less than'),
+		('=', 'Equal to'),
+		('>', 'Greater than'),
+	]
+
 	post_id = models.CharField(max_length=255, blank=False, null=True)
 	campaign = models.ForeignKey(
 		Campaign,
@@ -81,7 +94,37 @@ class Post(models.Model):
 	selected_variant = models.CharField(max_length=10, blank=True, null=True)
 
 	metrics = models.ForeignKey(PostMetrics, on_delete=models.SET_NULL, null=True, blank=True)
-	trigger = models.CharField(max_length=255, blank=True, null=True)
+
+	# New trigger fields
+	trigger_condition = models.CharField(
+		max_length=50,
+		choices=TRIGGER_CONDITION_CHOICES,
+		blank=True,
+		null=True,
+		help_text="Metric to monitor (likes, retweets, impressions, comments)"
+	)
+	trigger_value = models.IntegerField(
+		blank=True,
+		null=True,
+		help_text="Threshold value for trigger"
+	)
+	trigger_comparison = models.CharField(
+		max_length=1,
+		choices=TRIGGER_COMPARISON_CHOICES,
+		blank=True,
+		null=True,
+		help_text="Comparison operator (<, =, >)"
+	)
+	trigger_prompt = models.TextField(
+		blank=True,
+		null=True,
+		help_text="Action prompt when trigger is activated"
+	)
+	posted_time = models.DateTimeField(
+		blank=True,
+		null=True,
+		help_text="Time when post was published to X/Twitter"
+	)
 
 	# Many-to-many relationship to track post dependencies
 	next_posts = models.ManyToManyField(
