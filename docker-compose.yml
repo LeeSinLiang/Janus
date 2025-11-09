@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  janus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: janus-app
+    ports:
+      - "3000:3000"  # Frontend
+      - "8000:8000"  # Backend
+    volumes:
+      # Persist database
+      - ./backend/src/db.sqlite3:/app/backend/src/db.sqlite3
+      # Persist media files
+      - ./backend/src/media:/app/backend/src/media
+      - ./backend/generated_videos:/app/backend/generated_videos
+      # Mount .env file
+      - ./.env:/app/backend/.env
+      - ./.env:/app/frontend/.env.local
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=True
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+# Optional: Add PostgreSQL for production
+#  db:
+#    image: postgres:15-alpine
+#    container_name: janus-db
+#    environment:
+#      POSTGRES_DB: janus_db
+#      POSTGRES_USER: janus_user
+#      POSTGRES_PASSWORD: janus_password
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#    ports:
+#      - "5432:5432"
+#    restart: unless-stopped
+
+#volumes:
+#  postgres_data:

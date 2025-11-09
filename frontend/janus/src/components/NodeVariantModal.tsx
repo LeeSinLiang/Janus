@@ -37,17 +37,11 @@ function getFullAssetUrl(assetPath: string): string {
   return `${baseUrl}${path}`;
 }
 
-// Generate mock metrics for variants
-function generateMockMetrics(variantId: string) {
-  // Generate different mock data for variant A vs B
-  const seed = variantId === 'A' ? 1 : 2;
-
-  return {
-    likes: seed === 1 ? 3400 : 2800,
-    retweets: seed === 1 ? 1200 : 1500,
-    comments: seed === 1 ? 450 : 520,
-    positivity: seed === 1 ? 78 : 85,
-  };
+interface VariantMetrics {
+  likes: number;
+  retweets: number;
+  comments: number;
+  positivity: number;
 }
 
 interface NodeVariantModalProps {
@@ -56,6 +50,10 @@ interface NodeVariantModalProps {
   variant1: Variant;
   variant2: Variant;
   onSelectVariant?: (variantNumber: 1 | 2) => void;
+  variantMetrics?: {
+    A: VariantMetrics;
+    B: VariantMetrics;
+  };
 }
 
 export default function NodeVariantModal({
@@ -64,7 +62,18 @@ export default function NodeVariantModal({
   variant1,
   variant2,
   onSelectVariant,
+  variantMetrics,
 }: NodeVariantModalProps) {
+  // Default metrics if not provided
+  const defaultMetrics: VariantMetrics = {
+    likes: 0,
+    retweets: 0,
+    comments: 0,
+    positivity: 0,
+  };
+
+  const metricsA = variantMetrics?.A ?? defaultMetrics;
+  const metricsB = variantMetrics?.B ?? defaultMetrics;
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Close modal on Escape key
@@ -207,7 +216,7 @@ export default function NodeVariantModal({
             </button>
 
             {/* Metrics for Variant 1 */}
-            <VariantMetricsBox metrics={generateMockMetrics(variant1.variant_id)} />
+            <VariantMetricsBox metrics={metricsA} />
           </div>
 
           {/* Variant 2 Container */}
@@ -283,7 +292,7 @@ export default function NodeVariantModal({
             </button>
 
             {/* Metrics for Variant 2 */}
-            <VariantMetricsBox metrics={generateMockMetrics(variant2.variant_id)} />
+            <VariantMetricsBox metrics={metricsB} />
           </div>
         </div>
       </div>

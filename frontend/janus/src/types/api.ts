@@ -61,6 +61,27 @@ export interface Variant {
   };
 }
 
+/**
+ * A/B Testing Metrics Types
+ * Backend stores metrics as {"A": value, "B": value}
+ */
+export interface ABMetrics {
+  A: number;
+  B: number;
+}
+
+export interface VariantMetrics {
+  likes: number;
+  retweets: number;
+  impressions: number;
+  comments: number;
+}
+
+export interface ABVariantMetrics {
+  A: VariantMetrics;
+  B: VariantMetrics;
+}
+
 export interface Campaign {
   id: number;
   campaign_id: string;

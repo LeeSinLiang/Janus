@@ -27,7 +27,7 @@ import EngagementPieChart from './EngagementPieChart';
 import CampaignStatusBar from './CampaignStatusBar';
 import PostMetricsBox from './PostMetricsBox';
 import { useGraphData } from '@/hooks/useGraphData';
-import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost, approveAllNodes, checkTrigger } from '@/services/api';
+import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost, approveAllNodes, checkTrigger, getXPostMetrics } from '@/services/api';
 import { Node as FlowNode } from '@xyflow/react';
 import { THEME_COLORS } from '@/styles/theme';
 
@@ -54,6 +54,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
   // Modal state for viewing node variants
   const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
   const [variants, setVariants] = useState<any>(null);
+  const [variantMetrics, setVariantMetrics] = useState<any>(null);
 
   // Multi-node selection state
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
@@ -254,6 +255,21 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
         console.log('Setting variants and opening modal');
         setVariants(data.variants);
         setSelectedNode(node);
+
+        // Fetch metrics for this post
+        try {
+          console.log('Fetching metrics for node:', node.id);
+          const metricsData = await getXPostMetrics(node.id);
+          console.log('Metrics data received:', metricsData);
+
+          if (metricsData.metrics) {
+            setVariantMetrics(metricsData.metrics);
+          }
+        } catch (metricsError) {
+          console.error('Failed to fetch metrics:', metricsError);
+          // Continue without metrics - modal will show defaults
+          setVariantMetrics(null);
+        }
       } else {
         console.log('Not enough variants:', data.variants?.length || 0);
       }
@@ -399,10 +415,12 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
           onClose={() => {
             setSelectedNode(null);
             setVariants(null);
+            setVariantMetrics(null);
           }}
           variant1={variants[0]}
           variant2={variants[1]}
           onSelectVariant={handleSelectVariant}
+          variantMetrics={variantMetrics}
         />
       )}
 
