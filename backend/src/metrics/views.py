@@ -22,12 +22,23 @@ def getMetricsDB():
 		m = getattr(post, "metrics", None)
 		out[int(post.pk)] = {
 			"likes": m.likes if m else 0,
-			"impressions": m.impressions if m else 0,
+			"comments": m.comments if m else 0,
 			"retweets": m.retweets if m else 0,
 		}
 	return out
 
-
+###### FOR AI AGENT TO DETERMINE NEW DIRECTION/STRATEGY ######
+def getPostDetailsDB(pk):
+	post = Post.objects.get(pk=pk)
+	metrics = post.metrics
+	output = {
+		'title': post.title,
+		'description': post.description,
+		'likes': metrics.likes,
+		'retweets': metrics.retweets,
+		'commentList': metrics.commentList
+	}
+	return output
 
 @api_view(['GET'])
 def nodesJSON(request):
