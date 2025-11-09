@@ -92,7 +92,7 @@ export default function NodeVariantModal({
 
         {/* Modal title */}
         <h2 className="mb-8 text-center text-2xl font-semibold text-zinc-900">
-          Choose a better one
+          A/B Test Different Styles 
         </h2>
 
         {/* Two variants side by side */}
