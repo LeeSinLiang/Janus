@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -27,7 +27,7 @@ import EngagementPieChart from './EngagementPieChart';
 import CampaignStatusBar from './CampaignStatusBar';
 import PostMetricsBox from './PostMetricsBox';
 import { useGraphData } from '@/hooks/useGraphData';
-import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost, approveAllNodes } from '@/services/api';
+import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost, approveAllNodes, checkTrigger } from '@/services/api';
 import { Node as FlowNode } from '@xyflow/react';
 import { THEME_COLORS } from '@/styles/theme';
 
@@ -76,8 +76,16 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
   const { nodes, edges, postMetrics, loading, error, setNodes, setEdges, campaign } = useGraphData({
     pollingInterval: 5000,
     useMockData: false, // Set to false when connecting to real backend
-    campaignId: campaignId, // Pass campaign ID from props
   });
+
+  // Check triggers every 20 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkTrigger();
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Approve a pending node
   const handleApproveNode = useCallback(
