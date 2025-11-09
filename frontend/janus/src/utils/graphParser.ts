@@ -121,6 +121,7 @@ function createReactFlowNode(
       tags,
       phase: diagramNode.phase, // Include phase for layout algorithm
       pendingApproval, // Flag for showing approve/reject buttons
+      assetsReady: diagramNode.assets_ready, // Flag for showing asset loading indicator
     },
   };
 }

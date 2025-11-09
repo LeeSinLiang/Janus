@@ -38,6 +38,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
+### Quick Start with Makefile
+```bash
+# Install all dependencies and run migrations
+make init
+
+# Run both backend and frontend servers
+# Note: Runs sequentially, not in parallel. Use separate terminals for both servers.
+make run-backend    # Terminal 1: Django on :8000
+make run-frontend   # Terminal 2: Next.js on :3000
+```
+
 ### Backend Setup
 ```bash
 cd backend
@@ -71,6 +82,30 @@ npm run dev
 # Build for production
 npm run build
 npm start
+```
+
+### Docker Setup
+```bash
+# Quick start with Docker Compose (includes both frontend and backend)
+docker-compose up --build
+
+# Run in detached mode
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f
+
+# Stop containers
+docker-compose down
+
+# Run Django commands in container
+docker-compose exec janus bash -c "cd /app/backend/src && python manage.py createsuperuser"
+docker-compose exec janus bash -c "cd /app/backend/src && python manage.py migrate"
+
+# Access services
+# Frontend: http://localhost:3000
+# Backend: http://localhost:8000
+# Django Admin: http://localhost:8000/admin/
 ```
 
 ### Testing & Demos
@@ -131,10 +166,12 @@ python manage.py shell
 
 **Layer 2: Specialized Agents**
 - **Strategy Planner** (`strategy_planner.py`): Generates Mermaid diagrams with 3 phases
+- **Mini Strategy Agent** (`mini_strategy_agent.py`): Lightweight strategy planner variant
 - **Content Creator** (`content_creator.py`): A/B content variants (text + media prompts)
 - **Media Creator** (`media_creator.py`): Image generation (Imagen 3) or video generation (Veo 2)
 - **Metrics Analyzer** (`metrics_analyzer.py`): Performance analysis and recommendations
 - **X Platform** (`x_platform.py`): Twitter posting and scheduling operations
+- **Trigger Parser** (`trigger_parser.py`): Detects triggers and conditions for automation
 
 **Layer 1: Tools** (`agents/tools.py`)
 - Low-level operations: `post_tweet`, `get_metrics`, `validate_tweet_format`
@@ -214,8 +251,9 @@ result = media_agent.execute_video(prompt="...", duration=5)  # Returns video UR
 - `EngagementLineChart`, `EngagementPieChart`: Metrics visualization
 
 **State Management:**
-- `useGraphData` hook: Polls `/nodesJson/` every 2 seconds for updates
+- `useGraphData` hook: Polls `/nodesJson/` every 5 seconds for updates (configurable)
 - Local state for nodes/edges (ReactFlow)
+- Graph diff algorithm detects changes and marks new nodes as pending approval
 - API calls via `services/api.ts`
 
 **Routing:**
@@ -225,10 +263,20 @@ result = media_agent.execute_video(prompt="...", duration=5)  # Returns video UR
 **Data Flow:**
 1. User submits campaign via ChatBox
 2. Backend generates strategy (Mermaid diagram) → saves to DB
-3. Frontend polls `/nodesJson/` for updates
+3. Frontend polls `/nodesJson/` for updates (5s interval)
 4. ReactFlow renders nodes from parsed Mermaid
-5. User approves/rejects variants → backend generates new content
-6. Metrics displayed in real-time
+5. New nodes appear with green border (pending approval)
+6. User approves/rejects new nodes or clicks to view/select A/B variants
+7. Backend generates content variants on approval
+8. Metrics displayed in real-time
+
+**Polling & Approval System:**
+- Graph diff (`utils/graphDiff.ts`) detects new nodes and marks them `pendingApproval: true`
+- Pending nodes show green border (`border-4 border-green-400`) with approve/reject buttons
+- Approval is client-side only (removes `pendingApproval` flag)
+- Rejection removes node and connected edges from local state
+- See `frontend/janus/APPROVAL_SYSTEM.md` for detailed approval flow
+- See `frontend/janus/POLLING_SYSTEM.md` for polling architecture
 
 ### Database Schema (Django ORM + SQLite)
 
@@ -326,11 +374,50 @@ CORS_ALLOWED_ORIGINS = [
 
 ### Extending Database Schema
 
-1. Edit models in `backend/src/agents/models.py`
-2. Run `python manage.py makemigrations`
+1. Edit models in `backend/src/agents/models.py` or `backend/src/metrics/models.py`
+2. Run `cd backend/src && python manage.py makemigrations`
 3. Run `python manage.py migrate`
-4. Update serializers if REST API affected
-5. Register new models in `agents/admin.py`
+4. Update serializers if REST API affected (see `agents/serializers.py` or `metrics/serializers.py`)
+5. Register new models in admin interface (see `agents/admin.py` or `metrics/admin.py`)
+
+### Debugging Common Issues
+
+**Backend:**
+```bash
+# Check Django logs for errors
+cd backend/src && python manage.py runserver --verbosity 3
+
+# Test individual agents
+python -m agents.strategy_planner
+python -m agents.content_creator
+
+# Check database state
+python manage.py shell
+>>> from agents.models import Campaign, Post
+>>> Campaign.objects.all()
+
+# View admin interface
+# Create superuser first: python manage.py createsuperuser
+# Then visit http://localhost:8000/admin/
+```
+
+**Frontend:**
+```bash
+# Check browser console for errors (Chrome DevTools)
+# Enable verbose logging in CanvasWithPolling.tsx by adding console.logs
+
+# Test API endpoints directly
+curl http://localhost:8000/nodesJson/
+curl http://localhost:8000/getVariants/ -X POST -H "Content-Type: application/json" -d '{"post_id": 1}'
+
+# Check Next.js build errors
+npm run build
+```
+
+**CORS Issues:**
+- Ensure Django `CORS_ALLOWED_ORIGINS` includes frontend URL
+- Check `backend/src/janus/settings.py` for CORS configuration
+- Verify `NEXT_PUBLIC_API_URL` in `.env.local` matches backend URL
 
 ## Testing Without Real APIs
 
@@ -340,10 +427,12 @@ CORS_ALLOWED_ORIGINS = [
 
 ## Performance Notes
 
-- Frontend polls backend every 2 seconds (`useGraphData`)
+- Frontend polls backend every 5 seconds (`useGraphData`, configurable in `CanvasWithPolling.tsx`)
+- Backend returns `changes: false` when no updates to avoid unnecessary graph rebuilds
 - Database queries optimized with `.select_related()` and `.prefetch_related()`
 - Media files stored in `backend/src/media/` (served by Django in DEBUG mode)
 - ReactFlow layout uses Dagre for auto-positioning
+- Graph diff algorithm only updates changed nodes, not entire graph
 
 ## Known Limitations
 
@@ -352,13 +441,44 @@ CORS_ALLOWED_ORIGINS = [
 - Video generation is slow (~30-60 seconds per video)
 - No user authentication (single-user system currently)
 
+## Important Implementation Details
+
+### A/B Metrics Architecture (Migration Planned)
+Current implementation stores single metrics per post. Migration plan exists to support:
+- Both A and B variants posted simultaneously with separate `tweet_id`s
+- Separate metrics tracking for each variant
+- Display modes: max (canvas nodes), aggregated (charts), separate (modal)
+- See `AB_METRICS_MIGRATION_PLAN.md` for full migration strategy
+
+### Graph Diff Algorithm
+Located in `frontend/janus/src/utils/graphDiff.ts`:
+- Compares previous and current graph states
+- Detects added/removed/updated nodes and edges
+- Marks new nodes as `pendingApproval: true`
+- Only triggers ReactFlow updates when `changes: true` from backend
+
+### Mermaid Parser
+Located in `frontend/janus/src/utils/mermaidParser.ts` and `backend/src/agents/mermaid_parser.py`:
+- Parses custom Mermaid-like syntax with embedded XML tags
+- Frontend parser: Converts to ReactFlow nodes/edges with Dagre layout
+- Backend parser: Validates and extracts structured data from diagrams
+- Node format: `NODE_ID[<title>Title</title><description>Desc</description>]`
+
+### State Management Migration
+The project migrated from in-memory state to database-backed state:
+- Old: `agents/state.py` with in-memory dictionaries
+- New: Django ORM models (`Campaign`, `Post`, `ContentVariant`, etc.)
+- `AgentMemory` model stores conversation history
+- All agent operations now persist to SQLite
+
 ## Future Enhancements
 
 From `backend/notes/janus.md`:
-- Real X/Twitter API integration
+- Real X/Twitter API integration (currently uses mock `twitter_clone`)
 - ProductHunt API integration
 - Trigger detection engine (auto-swap underperforming variants)
 - Vector DB for semantic campaign search
-- PostgreSQL for production
-- ReactFlow canvas for visual campaign editing (partial - rendering only)
+- PostgreSQL for production (currently SQLite)
+- ReactFlow canvas for visual campaign editing (currently read-only with approval/rejection)
 - User authentication and multi-tenancy
+- WebSocket support for real-time updates (instead of polling)

@@ -10,6 +10,7 @@ export interface DiagramNode {
   phase: string;
   status?: string; // draft, published, etc.
   has_trigger?: boolean;
+  assets_ready?: boolean; // True if both A and B variants have assets
 }
 
 export interface NodeMetrics {
