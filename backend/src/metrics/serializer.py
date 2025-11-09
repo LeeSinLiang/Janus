@@ -15,6 +15,8 @@ class PostSerializer(serializers.ModelSerializer):
         fields = ('pk', 'title', 'description', 'next_posts', 'phase', 'status')
 
 class ContentVariantSerializer(serializers.ModelSerializer):
+    asset = serializers.FileField(required=False, allow_null=True)
+
     class Meta:
         model = ContentVariant
-        fields = ('variant_id', 'content', 'platform', 'metadata')
+        fields = ('variant_id', 'content', 'platform', 'metadata', 'asset')
