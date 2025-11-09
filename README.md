@@ -26,6 +26,7 @@ flowchart LR
   Store --> API
   API --> U
 ```
+<br>
 
 ## 🛠️ Tech Stack <br>
 Backend: Django, DRF, LangChain, LangGraph, Google Gemini Generative AI<br>
