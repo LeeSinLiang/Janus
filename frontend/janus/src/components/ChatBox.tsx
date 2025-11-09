@@ -276,12 +276,38 @@ export default function ChatBox({
 
         {/* Context button */}
         {!rejectionState && (
-          <div className="mb-2 flex gap-2">
-            <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
-              @ to add context
-            </button>
-            <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
-              / for commands
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex gap-2">
+              <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
+                @ to add context
+              </button>
+              <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
+                / for commands
+              </button>
+            </div>
+            {/* Send button */}
+            <button
+              onClick={handleSubmit}
+              className={`rounded-lg p-1.5 text-white transition-colors ${
+                rejectionState
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-zinc-900 hover:bg-zinc-700'
+              }`}
+              title={rejectionState ? 'Submit rejection' : 'Send message'}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
             </button>
           </div>
         )}
@@ -344,69 +370,7 @@ export default function ChatBox({
             </div>
           )}
 
-          {/* Bottom toolbar */}
-          <div className="mt-2 flex items-center justify-end">
-            <div className="flex items-right gap-2">
-              {/* Image icon */}
-              <button className="text-zinc-400 transition-colors hover:text-zinc-600">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-              </button>
-
-              {/* Video play icon */}
-              <button className="text-zinc-400 transition-colors hover:text-zinc-600">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-              </button>
-
-              {/* Send button */}
-              <button
-                onClick={handleSubmit}
-                className={`rounded-lg p-1.5 text-white transition-colors ${
-                  rejectionState
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-zinc-900 hover:bg-zinc-700'
-                }`}
-                title={rejectionState ? 'Submit rejection' : 'Send message'}
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          
         </div>
       </div>
     </div>
