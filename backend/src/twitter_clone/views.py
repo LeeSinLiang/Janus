@@ -1,3 +1,4 @@
+from debug import debug_print
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
@@ -31,7 +32,7 @@ def create_tweet(request):
 
     user, _ = User.objects.get_or_create(id=1, defaults={'username': 'default_user'})
     tweet = CloneTweet.objects.create(text=text, author=user)
-
+    debug_print(f"{user} created tweet {tweet.tweet_id} with text: {text}")
     if media:
         if not default_storage.exists(media):
             return Response({"errors": {"media": [f"File not found: {media}"]}},
