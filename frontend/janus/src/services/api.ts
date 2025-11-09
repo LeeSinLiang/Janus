@@ -363,6 +363,45 @@ export async function fetchCampaigns(): Promise<CampaignsResponse> {
 }
 
 /**
+ * Check triggers - sends GET request to check if any triggers should fire
+ */
+export async function checkTrigger(): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/checkTrigger/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    // Silent check - no error handling needed
+  } catch (error) {
+    // Silently fail - this is a background check
+  }
+}
+
+/**
+ * Send multi-node prompt - sends POST request with selected node pks and user prompt
+ */
+export async function sendMultiNodePrompt(nodes: number[], prompt: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/sintodo`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ nodes, prompt }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to send multi-node prompt: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error sending multi-node prompt:', error);
+    throw error;
+  }
+}
+
+/**
  * Mock function for development/testing
  * Remove this when connecting to real backend
  */

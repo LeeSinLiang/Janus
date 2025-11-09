@@ -6,7 +6,7 @@ class ContentVariantInline(admin.TabularInline):
     """Inline admin for content variants"""
     model = ContentVariant
     extra = 0
-    fields = ('variant_id', 'content', 'platform', 'metadata')
+    fields = ('variant_id', 'content', 'platform', 'asset', 'metadata')
     readonly_fields = ('created_at',)
 
 

@@ -61,6 +61,24 @@ def getMetricsAI(pk):
 	return output
 
 @api_view(['GET'])
+def checkTrigger(request):
+	publishedPosts = Post.objects.filter(status="published").select_related('metrics').order_by('created_at')
+	triggeredPosts = []
+	for post in publishedPosts:
+		if (post.trigger == "like"):
+			if (post.metrics.likes < 1):
+				triggeredPosts.append(post.pk)
+		elif (post.trigger == "retweet"):
+			if (post.metrics.retweets < 1):
+				triggeredPosts.append(post.pk)
+	
+	if (triggeredPosts):
+		print("Triggered posts:", triggeredPosts)
+		# callSinAgentAPI(triggeredPosts)
+
+	return Response({"triggered_posts": triggeredPosts}, status=200)
+
+@api_view(['GET'])
 def nodesJSON(request):
 	# Get campaign_id from query params, fallback to first campaign
 	campaign_id = request.GET.get('campaign_id')
@@ -92,18 +110,12 @@ def nodesJSON(request):
 		"description": campaign.description,
 	}
 
-	# Include campaign status information
-	campaign_info = {
-		"campaign_id": campaign.campaign_id,
-		"name": campaign.name,
-		"phase": campaign.phase,
-		"description": campaign.description,
-	}
-
 	# Get first 4 published posts with metrics for the chart view
-	published_posts = Post.objects.filter(status="published").select_related('metrics').order_by('created_at')[:4]
+	published_posts = Post.objects.filter(status="published").select_related('metrics').order_by('created_at')
+	chartPosts = published_posts[:4]
+
 	post_metrics = []
-	for post in published_posts:
+	for post in chartPosts:
 		m = getattr(post, "metrics", None)
 		post_metrics.append({
 			"pk": post.pk,
@@ -134,17 +146,18 @@ def createXPost(request):
 	if post.selected_variant:
 		variant = ContentVariant.objects.filter(variant_id=post.selected_variant, post=post).first()
 		text = variant.content if variant else post.description
+		media_name = getattr(getattr(variant, "asset", None), "name", None)
 	else:
-		
-		variant = ContentVariant.objects.filter(variant_id="A", post=post).first()
+		variant = ContentVariant.objects.filter(variant_id="B", post=post).first()
 		text = variant.content if variant else post.description
+		media_name = getattr(getattr(variant, "asset", None), "name", None)
 
 	# Use clone API instead of real Twitter API
 	url = f"http://localhost:8000/clone/2/tweets"
 	headers = {
 		"Content-Type": "application/json"
 	}
-	body = {"text": text}
+	body = {"text": text, "media": media_name}
 
 	resp = requests.post(url, headers=headers, json=body)
 	data = resp.json()
