@@ -80,7 +80,8 @@ class Post(models.Model):
 	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
 	selected_variant = models.CharField(max_length=10, blank=True, null=True)
 
-	metrics = models.ForeignKey(PostMetrics, on_delete=models.SET_NULL, null=True, blank=True)
+	metricsA = models.ForeignKey(PostMetrics, on_delete=models.SET_NULL, null=True, blank=True)
+	metricsB = models.ForeignKey(PostMetrics, on_delete=models.SET_NULL, null=True, blank=True)
 	trigger = models.CharField(max_length=255, blank=True, null=True)
 
 	# Many-to-many relationship to track post dependencies

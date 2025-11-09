@@ -60,8 +60,12 @@ class PostAdmin(admin.ModelAdmin):
         ('Post Information', {
             'fields': ('title', 'description', 'next_posts', 'post_id', 'campaign', 'phase', 'status', 'selected_variant', 'trigger')
         }),
-        ('Metrics', {
-            'fields': ('metrics',),
+        ('MetricsA', {
+            'fields': ('metricsA',),
+            'classes': ('collapse',)
+        }),
+        ('MetricsB', {
+            'fields': ('metricsB',),
             'classes': ('collapse',)
         }),
         ('Timestamps', {

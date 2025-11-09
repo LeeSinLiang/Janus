@@ -16,6 +16,28 @@ from django.core.cache import cache
 
 
 # Create your views here.
+def helper(data):
+	items = data.get("data") or []
+	if not items:
+		return Response({"error": "Tweet not found in clone API."}, status=404)
+
+	d = items[0]
+	pub = d.get("public_metrics", {})
+	nonpub = d.get("non_public_metrics", {})
+
+	retweetCount = pub.get("retweet_count")
+	likeCount = pub.get("like_count")
+	commentCount = pub.get("reply_count")
+	impressionCount = nonpub.get("impression_count")
+	commentList = CloneComment.objects.filter(tweet__tweet_id=tweet_id).order_by('-created_at').values_list('text', flat=True)
+
+	postMetrics.retweets = retweetCount
+	postMetrics.likes = likeCount
+	postMetrics.impressions = impressionCount
+	postMetrics.comments = commentCount
+	postMetrics.commentList = list(commentList)
+	postMetrics.save()
+
 def getMetricsDB():
 	posts = Post.objects.filter(status="published").select_related('metrics')
 	out = {}
@@ -50,13 +72,23 @@ def setTrigger(request):
 ###### FOR AI AGENT TO DETERMINE NEW DIRECTION/STRATEGY ######
 def getMetricsAI(pk):
 	post = Post.objects.get(pk=pk)
-	metrics = post.metrics
+	metricsA = post.metricsA
+	metricsB = post.metricsB
 	output = {
-		'title': post.title,
-		'description': post.description,
-		'likes': metrics.likes,
-		'retweets': metrics.retweets,
-		'commentList': metrics.commentList
+		'A' : {
+			'title': post.title,
+			'description': post.description,
+			'likes': metricsA.likes,
+			'retweets': metricsA.retweets,
+			'commentList': metricsA.commentList
+		},
+		'B' : {
+			'title': post.title,
+			'description': post.description,
+			'likes': metricsB.likes,
+			'retweets': metricsB.retweets,
+			'commentList': metricsB.commentList
+		}
 	}
 	return output
 
@@ -116,15 +148,24 @@ def nodesJSON(request):
 
 	post_metrics = []
 	for post in chartPosts:
-		m = getattr(post, "metrics", None)
+		mA = getattr(post, "metricsA", None)
+		mB = getattr(post, "metricsB", None)
 		post_metrics.append({
 			"pk": post.pk,
 			"title": post.title,
 			"description": post.description,
-			"likes": m.likes if m else 0,
-			"retweets": m.retweets if m else 0,
-			"impressions": m.impressions if m else 0,
-			"comments": m.comments if m else 0,
+			'A' :{
+				"likes": mA.likes if mA else 0,
+				"retweets": mA.retweets if mA else 0,
+				"impressions": mA.impressions if mA else 0,
+				"comments": mA.comments if mA else 0,
+			},
+			'B' :{
+				"likes": mB.likes if mB else 0,
+				"retweets": mB.retweets if mB else 0,
+				"impressions": mB.impressions if mB else 0,
+				"comments": mB.comments if mB else 0,
+			}
 		})
 
 	return Response({
@@ -142,37 +183,57 @@ def createXPost(request):
 
 	post = Post.objects.get(pk=pk)
 
-	
-	if post.selected_variant:
-		variant = ContentVariant.objects.filter(variant_id=post.selected_variant, post=post).first()
-		text = variant.content if variant else post.description
-		media_name = getattr(getattr(variant, "asset", None), "name", None)
-	else:
-		variant = ContentVariant.objects.filter(variant_id="B", post=post).first()
-		text = variant.content if variant else post.description
-		media_name = getattr(getattr(variant, "asset", None), "name", None)
+	# if post.selected_variant:
+	# 	variant = ContentVariant.objects.filter(variant_id=post.selected_variant, post=post).first()
+	# 	text = variant.content if variant else post.description
+	# 	media_name = getattr(getattr(variant, "asset", None), "name", None)
+	# else:
+	# 	variant = ContentVariant.objects.filter(variant_id="B", post=post).first()
+	# 	text = variant.content if variant else post.description
+	# 	media_name = getattr(getattr(variant, "asset", None), "name", None)
+
+	variantA = ContentVariant.objects.filter(variant_id="A", post=post).first()
+	textA = variantA.content
+	media_nameA = getattr(getattr(variantA, "asset", None), "name", None)
+
+	variantB = ContentVariant.objects.filter(variant_id="A", post=post).first()
+	textB = variantB.content
+	media_nameB = getattr(getattr(variantB, "asset", None), "name", None)
 
 	# Use clone API instead of real Twitter API
 	url = f"http://localhost:8000/clone/2/tweets"
 	headers = {
 		"Content-Type": "application/json"
 	}
-	body = {"text": text, "media": media_name}
+	bodyA = {"text": textA, "media": media_nameA}
+	bodyB = {"text": textB, "media": media_nameB}
 
-	resp = requests.post(url, headers=headers, json=body)
-	data = resp.json()
+	respA = requests.post(url, headers=headers, json=bodyA)
+	respB = requests.post(url, headers=headers, json=bodyB)
+	dataA = respA.json()
+	dataB = respB.json()
 
-	if resp.status_code == 201:
-		tweet_id = (data.get("data")).get("id")
+	if respA.status_code == 201:
+		tweet_id = (dataA.get("data")).get("id")
 		if tweet_id:
-			postMetrics = post.metrics
+			postMetrics = post.metricsA
+			if postMetrics:
+				postMetrics.tweet_id = tweet_id
+				postMetrics.save()
+			post.status = "published"
+			post.save()
+		
+	if respB.status_code == 201:
+		tweet_id = (dataB.get("data")).get("id")
+		if tweet_id:
+			postMetrics = post.metricsB
 			if postMetrics:
 				postMetrics.tweet_id = tweet_id
 				postMetrics.save()
 			post.status = "published"
 			post.save()
 
-	return Response(resp.json(), status=resp.status_code)
+	return Response(respA.json()+respB.json(), status=respA.status_code)
 
 @api_view(['POST'])
 def getXPostMetrics(request):
@@ -181,43 +242,33 @@ def getXPostMetrics(request):
 		return Response({"error": "Missing 'pk' field"}, status=400)
 
 	post = Post.objects.get(pk=pk)
-	postMetrics = post.metrics
-	tweet_id = postMetrics.tweet_id
+	postMetricsA = post.metricsA
+	postMetricsB = post.metricsB
+	
+	tweet_idA = postMetricsA.tweet_id
+	tweet_idB = postMetricsB.tweet_id
 
 	# Use clone API instead of real Twitter API
 	url = f"http://localhost:8000/clone/2/metrics/"
 	headers = {
 		"Content-Type": "application/json"
 	}
-	body = {"tweet_ids": tweet_id}
+	bodyA = {"tweet_ids": tweet_idA}
+	bodyB = {"tweet_ids": tweet_idB}
 
-	resp = requests.post(url, headers=headers, json=body)
-	data = resp.json()
+	respA = requests.post(url, headers=headers, json=bodyA)
+	respB = requests.post(url, headers=headers, json=bodyB)
+	dataA = respA.json()
+	dataB = respB.json()
 
-	if resp.status_code != 200:
-		return Response({"error": resp.text}, status=resp.status_code)
+	if respA.status_code != 200:
+		return Response({"error": respA.text}, status=respA.status_code)
+	if respB.status_code != 200:
+		return Response({"error": respB.text}, status=respB.status_code)
 	
-	data = resp.json()
-	items = data.get("data") or []
-	if not items:
-		return Response({"error": "Tweet not found in clone API."}, status=404)
+	helper(dataA)
+	helper(dataB)
 
-	d = items[0]
-	pub = d.get("public_metrics", {})
-	nonpub = d.get("non_public_metrics", {})
-
-	retweetCount = pub.get("retweet_count")
-	likeCount = pub.get("like_count")
-	commentCount = pub.get("reply_count")
-	impressionCount = nonpub.get("impression_count")
-	commentList = CloneComment.objects.filter(tweet__tweet_id=tweet_id).order_by('-created_at').values_list('text', flat=True)
-
-	postMetrics.retweets = retweetCount
-	postMetrics.likes = likeCount
-	postMetrics.impressions = impressionCount
-	postMetrics.comments = commentCount
-	postMetrics.commentList = list(commentList)
-	postMetrics.save()
 
 	return Response(resp.json(), status=resp.status_code)
 
