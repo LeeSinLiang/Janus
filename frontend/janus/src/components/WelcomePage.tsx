@@ -9,6 +9,7 @@ export default function WelcomePage() {
   const router = useRouter();
   const [productDescription, setProductDescription] = useState('');
   const [gtmGoals, setGtmGoals] = useState('');
+  const [enableVideo, setEnableVideo] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,6 +26,7 @@ export default function WelcomePage() {
         product_description: productDescription,
         gtm_goals: gtmGoals,
         campaign_name: 'Campaign',
+        enable_video: enableVideo,
       });
 
       // Navigate to canvas with campaign_id
@@ -104,26 +106,48 @@ export default function WelcomePage() {
             />
           </div>
 
-          {/* GTM Goals Input with Submit Button */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-6 py-4 flex items-center gap-4">
-            <div className="flex-1">
-              <label className="block text-gray-600 text-base mb-2">
-                GTM Goals :
-              </label>
-              <input
-                type="text"
-                value={gtmGoals}
-                onChange={(e) => setGtmGoals(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="What's your marketing goal?"
-                className="w-full text-gray-400 text-base outline-none bg-transparent"
-              />
-            </div>
+          {/* GTM Goals Input */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-6 py-4">
+            <label className="block text-gray-600 text-base mb-2">
+              GTM Goals :
+            </label>
+            <input
+              type="text"
+              value={gtmGoals}
+              onChange={(e) => setGtmGoals(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="What's your marketing goal?"
+              className="w-full text-gray-400 text-base outline-none bg-transparent"
+            />
+          </div>
 
-            {/* Submit Button */}
+          {/* Video Generation Toggle */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-6 py-4 flex items-center justify-between">
+            <div>
+              <label className="block text-gray-600 text-base mb-1">
+                Generate Video for Second Post (Rate Limit Capped)
+              </label>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEnableVideo(!enableVideo)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                enableVideo ? 'bg-orange-500' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  enableVideo ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end">
             <button
               type="submit"
-              className="flex-shrink-0 w-12 h-12 rounded-full bg-orange-500 hover:bg-orange-600 transition-colors flex items-center justify-center"
+              className="w-12 h-12 rounded-full bg-orange-500 hover:bg-orange-600 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!productDescription.trim() || !gtmGoals.trim()}
             >
               <svg

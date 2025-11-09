@@ -4,6 +4,10 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
+# Accept build arguments for Next.js environment variables
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Copy package files
 COPY frontend/janus/package*.json ./
 
@@ -13,7 +17,7 @@ RUN npm ci --legacy-peer-deps
 # Copy frontend source
 COPY frontend/janus/ ./
 
-# Build Next.js app
+# Build Next.js app (env vars are now available)
 RUN npm run build
 
 # Stage 2: Final Image with Backend + Built Frontend

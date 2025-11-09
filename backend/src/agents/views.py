@@ -3,14 +3,17 @@ API Views for Agents
 """
 
 import base64
+import random
 import threading
 import time
+import os
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction, connection
 from django.db.utils import OperationalError
 from django.core.files.base import ContentFile
+from django.core.files import File
 
 from .serializers import (
 	StrategyPlanningRequestSerializer,
@@ -19,7 +22,7 @@ from .serializers import (
 	PostSerializer
 )
 from .strategy_planner import create_strategy_planner
-from .content_creator import create_content_creator, save_content_variants_for_post
+from .content_creator import create_content_creator, create_video_content_creator, save_content_variants_for_post
 from .media_creator import create_media_creator
 from .mermaid_parser import parse_mermaid_diagram
 from .mini_strategy_agent import create_mini_strategy_agent
@@ -66,19 +69,20 @@ def retry_on_db_lock(func, max_retries=5, initial_delay=0.1):
 		raise last_exception
 
 
-def generate_ab_content_background(campaign_id: str, product_description: str):
+def generate_ab_content_background(campaign_id: str, product_description: str, enable_video: bool = False):
 	"""
 	Background task to generate A/B content for all posts in a campaign.
 
 	This function:
 	1. Sets campaign phase to "content_creation"
 	2. Generates A/B content variants for all posts
-	3. Generates media assets for each variant
+	3. Generates media assets for each variant (video for second post if enabled)
 	4. Sets campaign phase to "scheduled" when complete
 
 	Args:
 		campaign_id: ID of the campaign to generate content for
 		product_description: Product description for content generation context
+		enable_video: If True, generates video for one random variant of the second post
 	"""
 	# IMPORTANT: Close any existing database connections
 	# Threads need to manage their own database connections
@@ -95,18 +99,26 @@ def generate_ab_content_background(campaign_id: str, product_description: str):
 
 		campaign = retry_on_db_lock(update_campaign_phase_to_creation)
 
-		# Step 2: Initialize agents (outside of database transactions)
-		content_agent = create_content_creator()
-		media_agent = create_media_creator(model_name='models/gemini-2.5-flash-image')
-
-		# Step 3: Get all posts from campaign
+		# Step 2: Get all posts from campaign
 		def get_posts():
 			return list(Campaign.objects.get(campaign_id=campaign_id).posts.all().order_by('phase', 'post_id'))
 
 		posts = retry_on_db_lock(get_posts)
 
-		# Step 4: Generate A/B content for each post
-		for post in posts:
+		# Step 3: Generate A/B content for each post
+		for post_index, post in enumerate(posts):
+			# Determine if this is the second post and video is enabled
+			is_second_post_with_video = (post_index == 1 and enable_video)
+
+			# Initialize agents for this post (always use standard content creator)
+			content_agent = create_content_creator()
+			media_agent_image = create_media_creator(model_name='models/gemini-2.5-flash-image')
+
+			# Randomly select which variant gets video (for second post only)
+			selected_variant = random.choice(['A', 'B']) if is_second_post_with_video else None
+			if is_second_post_with_video:
+				media_agent_video = create_media_creator(model_name='models/veo-3.1-generate-preview')
+				print(f"Second post: Generating video for variant {selected_variant}")
 			try:
 				# Generate A/B content (outside of database transaction)
 				content_output = content_agent.execute(
@@ -115,61 +127,123 @@ def generate_ab_content_background(campaign_id: str, product_description: str):
 					product_info=product_description
 				)
 
-				# Create ContentVariant A with retry logic
-				def create_variant_a():
-					with transaction.atomic():
-						return ContentVariant.objects.create(
-							post=post,
-							variant_id='A',
-							content=content_output.A,
-							platform='X',
-							metadata={'image_caption': content_output.A_image_caption}
-						)
+				# Handle Variant A
+				if is_second_post_with_video and selected_variant == 'A':
+					# Variant A gets video
+					def create_variant_a():
+						with transaction.atomic():
+							return ContentVariant.objects.create(
+								post=post,
+								variant_id='A',
+								content=content_output.A,
+								platform='X',
+								metadata={'video_caption': content_output.A_image_caption}
+							)
 
-				variant_a = retry_on_db_lock(create_variant_a)
+					variant_a = retry_on_db_lock(create_variant_a)
 
-				# Generate and save media for Variant A
-				try:
-					asset_a = media_agent.create_image(prompt=content_output.A_image_caption)
-					mime_type = asset_a['mime_type']
-					ext = mime_type.split('/')[-1]
-					data = ContentFile(base64.b64decode(asset_a['data']))
+					# Generate and save video for Variant A
+					try:
+						print(f"  Generating video for variant A...")
+						video_data = media_agent_video.create_video(prompt=content_output.A_image_caption)
 
-					# Save asset with retry logic
-					def save_variant_a_asset():
-						variant_a.asset.save(f'variant_a_image.{ext}', data, save=True)
+						# Save video file
+						with open(video_data['file_path'], 'rb') as f:
+							def save_variant_a_video():
+								variant_a.asset.save(f'variant_a_video.mp4', File(f), save=True)
+							retry_on_db_lock(save_variant_a_video)
 
-					retry_on_db_lock(save_variant_a_asset)
-				except Exception as e:
-					print(f"Warning: Failed to generate image for variant A of post {post.post_id}: {e}")
+						# Clean up temp file
+						os.remove(video_data['file_path'])
+						print(f"  ✅ Video generated and saved for variant A")
+					except Exception as e:
+						print(f"Warning: Failed to generate video for variant A of post {post.post_id}: {e}")
+				else:
+					# Variant A gets image
+					def create_variant_a():
+						with transaction.atomic():
+							return ContentVariant.objects.create(
+								post=post,
+								variant_id='A',
+								content=content_output.A,
+								platform='X',
+								metadata={'image_caption': content_output.A_image_caption}
+							)
 
-				# Create ContentVariant B with retry logic
-				def create_variant_b():
-					with transaction.atomic():
-						return ContentVariant.objects.create(
-							post=post,
-							variant_id='B',
-							content=content_output.B,
-							platform='X',
-							metadata={'image_caption': content_output.B_image_caption}
-						)
+					variant_a = retry_on_db_lock(create_variant_a)
 
-				variant_b = retry_on_db_lock(create_variant_b)
+					# Generate and save image for Variant A
+					try:
+						asset_a = media_agent_image.create_image(prompt=content_output.A_image_caption)
+						mime_type = asset_a['mime_type']
+						ext = mime_type.split('/')[-1]
+						data = ContentFile(base64.b64decode(asset_a['data']))
 
-				# Generate and save media for Variant B
-				try:
-					asset_b = media_agent.create_image(prompt=content_output.B_image_caption)
-					mime_type = asset_b['mime_type']
-					ext = mime_type.split('/')[-1]
-					data = ContentFile(base64.b64decode(asset_b['data']))
+						def save_variant_a_asset():
+							variant_a.asset.save(f'variant_a_image.{ext}', data, save=True)
 
-					# Save asset with retry logic
-					def save_variant_b_asset():
-						variant_b.asset.save(f'variant_b_image.{ext}', data, save=True)
+						retry_on_db_lock(save_variant_a_asset)
+					except Exception as e:
+						print(f"Warning: Failed to generate image for variant A of post {post.post_id}: {e}")
 
-					retry_on_db_lock(save_variant_b_asset)
-				except Exception as e:
-					print(f"Warning: Failed to generate image for variant B of post {post.post_id}: {e}")
+				# Handle Variant B
+				if is_second_post_with_video and selected_variant == 'B':
+					# Variant B gets video
+					def create_variant_b():
+						with transaction.atomic():
+							return ContentVariant.objects.create(
+								post=post,
+								variant_id='B',
+								content=content_output.B,
+								platform='X',
+								metadata={'video_caption': content_output.B_image_caption}
+							)
+
+					variant_b = retry_on_db_lock(create_variant_b)
+
+					# Generate and save video for Variant B
+					try:
+						print(f"  Generating video for variant B...")
+						video_data = media_agent_video.create_video(prompt=content_output.B_image_caption)
+
+						# Save video file
+						with open(video_data['file_path'], 'rb') as f:
+							def save_variant_b_video():
+								variant_b.asset.save(f'variant_b_video.mp4', File(f), save=True)
+							retry_on_db_lock(save_variant_b_video)
+
+						# Clean up temp file
+						os.remove(video_data['file_path'])
+						print(f"  ✅ Video generated and saved for variant B")
+					except Exception as e:
+						print(f"Warning: Failed to generate video for variant B of post {post.post_id}: {e}")
+				else:
+					# Variant B gets image
+					def create_variant_b():
+						with transaction.atomic():
+							return ContentVariant.objects.create(
+								post=post,
+								variant_id='B',
+								content=content_output.B,
+								platform='X',
+								metadata={'image_caption': content_output.B_image_caption}
+							)
+
+					variant_b = retry_on_db_lock(create_variant_b)
+
+					# Generate and save image for Variant B
+					try:
+						asset_b = media_agent_image.create_image(prompt=content_output.B_image_caption)
+						mime_type = asset_b['mime_type']
+						ext = mime_type.split('/')[-1]
+						data = ContentFile(base64.b64decode(asset_b['data']))
+
+						def save_variant_b_asset():
+							variant_b.asset.save(f'variant_b_image.{ext}', data, save=True)
+
+						retry_on_db_lock(save_variant_b_asset)
+					except Exception as e:
+						print(f"Warning: Failed to generate image for variant B of post {post.post_id}: {e}")
 
 			except Exception as e:
 				print(f"Error generating variants for post {post.post_id}: {e}")
@@ -419,6 +493,7 @@ class StrategyPlanningAPIView(APIView):
 		# Extract validated data
 		product_description = serializer.validated_data['product_description']
 		gtm_goals = serializer.validated_data['gtm_goals']
+		enable_video = serializer.validated_data.get('enable_video', False)
 
 		try:
 			# Step 1: Generate strategy with Strategy Planner
@@ -494,7 +569,7 @@ class StrategyPlanningAPIView(APIView):
 			# 3. Set campaign phase to "scheduled" when complete
 			content_thread = threading.Thread(
 				target=generate_ab_content_background,
-				args=(campaign_id, product_description),
+				args=(campaign_id, product_description, enable_video),
 				daemon=True
 			)
 			content_thread.start()

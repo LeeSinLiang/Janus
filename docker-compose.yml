@@ -5,9 +5,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Pass build-time env vars to Next.js build
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     container_name: janus-app
     ports:
-      - "3000:3000"  # Frontend
+      - "80:3000"  # Frontend
       - "8000:8000"  # Backend
     volumes:
       # Persist database (mount parent dir to avoid file vs directory issue)
