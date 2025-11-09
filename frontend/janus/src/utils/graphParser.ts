@@ -94,6 +94,11 @@ function createReactFlowNode(
 
   const tags = [statusTag];
 
+  // Add a clock emoji tag if the node has a trigger
+  if (diagramNode.has_trigger) {
+    tags.push({ label: '⏰', color: '#A1A1AA' }); // A neutral gray color
+  }
+
   // Get metrics for this node if available
   const metrics = metricsMap[diagramNode.pk];
   const likes = metrics?.likes ?? 1;

@@ -10,9 +10,14 @@ class PostMetricsSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PostSerializer(serializers.ModelSerializer):
+    has_trigger = serializers.SerializerMethodField()
+
     class Meta:
         model = Post
-        fields = ('pk', 'title', 'description', 'next_posts', 'phase', 'status')
+        fields = ('pk', 'title', 'description', 'next_posts', 'phase', 'status', 'has_trigger')
+
+    def get_has_trigger(self, obj):
+        return obj.trigger_condition is not None
 
 class ContentVariantSerializer(serializers.ModelSerializer):
     asset = serializers.FileField(required=False, allow_null=True)

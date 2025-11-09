@@ -9,6 +9,7 @@ export interface DiagramNode {
   next_posts: number[];
   phase: string;
   status?: string; // draft, published, etc.
+  has_trigger?: boolean;
 }
 
 export interface NodeMetrics {
