@@ -120,6 +120,11 @@ class Post(models.Model):
 		null=True,
 		help_text="Action prompt when trigger is activated"
 	)
+	trigger_duration = models.IntegerField(
+		blank=True,
+		null=True,
+		help_text="Minimum elapsed time in seconds before trigger can fire"
+	)
 	posted_time = models.DateTimeField(
 		blank=True,
 		null=True,

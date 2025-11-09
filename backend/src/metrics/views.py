@@ -93,6 +93,7 @@ def parseTrigger(request):
 		post.trigger_value = trigger_config.value
 		post.trigger_comparison = trigger_config.comparison
 		post.trigger_prompt = trigger_config.prompt
+		post.trigger_duration = trigger_config.duration
 		post.save()
 
 		return Response({
@@ -102,6 +103,7 @@ def parseTrigger(request):
 				"condition": condition,
 				"value": trigger_config.value,
 				"comparison": trigger_config.comparison,
+				"duration": trigger_config.duration,
 				"prompt": trigger_config.prompt
 			}
 		}, status=status.HTTP_200_OK)
@@ -330,7 +332,8 @@ def checkTrigger(request):
 		status="published",
 		trigger_condition__isnull=False,
 		trigger_value__isnull=False,
-		trigger_comparison__isnull=False
+		trigger_comparison__isnull=False,
+		trigger_duration__isnull=False
 	)
 
 	# Filter by campaign if campaign_id provided
@@ -348,6 +351,12 @@ def checkTrigger(request):
 
 		# Calculate elapsed time since posting
 		elapsed_time = (timezone.now() - post.posted_time).total_seconds()
+
+		# Check if minimum duration has passed (if duration is configured)
+		if post.trigger_duration is not None:
+			if elapsed_time < post.trigger_duration:
+				# Not enough time has passed, skip this post
+				continue
 
 		# Get metrics for both A/B variants
 		metrics_a = post.metrics.get_variant_metrics('A')
@@ -388,6 +397,7 @@ def checkTrigger(request):
 				"trigger_condition": post.trigger_condition,
 				"trigger_value": post.trigger_value,
 				"trigger_comparison": post.trigger_comparison,
+				"trigger_duration": post.trigger_duration,
 				"current_value_a": metric_value_a,
 				"current_value_b": metric_value_b,
 				"triggered_variants": triggered_variants,

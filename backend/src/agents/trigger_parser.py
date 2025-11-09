@@ -2,11 +2,12 @@
 Trigger Parser Agent - Parses natural language trigger prompts into structured trigger configurations.
 
 Uses modern LangChain structured output with response_format for parsing user prompts like:
-"less than 5, generate new strategy focused on emotional engagement"
+"less than 5 within 3600, make it in cartoon style post"
 
 Outputs:
 - value: int (threshold value for trigger)
 - comparison: Literal['<', '=', '>'] (comparison operator)
+- duration: int (minimum elapsed time in seconds before trigger fires)
 - prompt: str (action prompt when trigger is activated)
 """
 
@@ -29,8 +30,11 @@ class TriggerConfig(BaseModel):
     comparison: Literal['<', '=', '>'] = Field(
         description="The comparison operator: '<' for less than, '=' for equals, '>' for greater than"
     )
+    duration: int = Field(
+        description="Minimum elapsed time in seconds before trigger can fire (e.g., 3600 for 1 hour, 7200 for 2 hours)"
+    )
     prompt: str = Field(
-        description="The action prompt/instruction to execute when the trigger is activated (e.g., 'generate new strategy focused on emotional engagement')"
+        description="The action prompt/instruction to execute when the trigger is activated (e.g., 'make it in cartoon style post', 'focus on emotional engagement')"
     )
 
 
@@ -58,23 +62,28 @@ class TriggerParserAgent:
         system_prompt = """You are a trigger configuration parser. Your job is to parse natural language trigger prompts into structured data.
 
 The user will provide a prompt in the format:
-"COMPARISON VALUE, ACTION_PROMPT"
+"COMPARISON VALUE within DURATION, ACTION_PROMPT"
 
 Examples:
-- "less than 5, generate new strategy focused on emotional engagement"
-  → value=5, comparison='<', prompt='generate new strategy focused on emotional engagement'
+- "less than 5 within 3600, make it in cartoon style post"
+  → value=5, comparison='<', duration=3600, prompt='make it in cartoon style post'
 
-- "greater than 10, create celebratory follow-up post"
-  → value=10, comparison='>', prompt='create celebratory follow-up post'
+- "greater than 10 within 7200, create celebratory follow-up post"
+  → value=10, comparison='>', duration=7200, prompt='create celebratory follow-up post'
 
-- "equals 0, pivot strategy immediately"
-  → value=0, comparison='=', prompt='pivot strategy immediately'
+- "equals 0 within 1800, pivot strategy immediately"
+  → value=0, comparison='=', duration=1800, prompt='pivot strategy immediately'
+
+- "under 3 within 600, improve engagement tactics"
+  → value=3, comparison='<', duration=600, prompt='improve engagement tactics'
 
 IMPORTANT:
-- Extract the numeric value
-- Map comparison words to operators: 'less than'/'<' → '<', 'greater than'/'>' → '>', 'equals'/'=' → '='
+- Extract the numeric threshold value (e.g., 5 from "less than 5")
+- Map comparison words to operators: 'less than'/'under'/'<' → '<', 'greater than'/'over'/'>' → '>', 'equals'/'=' → '='
+- Extract the duration in seconds (number after "within")
 - Extract the action prompt (everything after the comma)
-- Be flexible with natural language variations (e.g., "under 5" = "less than 5")
+- Be flexible with natural language variations
+- Duration is ALWAYS required and must be in seconds
 """
 
         # Create agent with structured output using response_format
@@ -91,17 +100,18 @@ IMPORTANT:
 
         Args:
             condition: The metric condition being monitored (e.g., 'likes', 'retweets')
-            user_prompt: Natural language prompt (e.g., 'less than 5, generate new strategy')
+            user_prompt: Natural language prompt (e.g., 'less than 5 within 3600, make it in cartoon style')
 
         Returns:
-            TriggerConfig with parsed value, comparison, and prompt
+            TriggerConfig with parsed value, comparison, duration, and prompt
 
         Example:
             >>> agent = TriggerParserAgent()
-            >>> config = agent.parse('likes', 'less than 5, generate new strategy')
+            >>> config = agent.parse('likes', 'less than 5 within 3600, make it in cartoon style')
             >>> print(config.value)  # 5
             >>> print(config.comparison)  # '<'
-            >>> print(config.prompt)  # 'generate new strategy'
+            >>> print(config.duration)  # 3600
+            >>> print(config.prompt)  # 'make it in cartoon style'
         """
         # Invoke agent with the user's prompt
         result = self.agent.invoke({
@@ -137,10 +147,10 @@ if __name__ == "__main__":
 
     # Test cases
     test_cases = [
-        ("likes", "less than 5, generate new strategy focused on emotional engagement"),
-        ("retweets", "greater than 10, create celebratory follow-up post"),
-        ("impressions", "equals 0, pivot strategy immediately"),
-        ("comments", "under 3, improve engagement tactics"),
+        ("likes", "less than 5 within 3600 seconds, make it in cartoon style post"),
+        ("retweets", "greater than 10 within 7200, create celebratory follow-up post"),
+        ("impressions", "equals 0 within 1800 seconds, pivot strategy immediately"),
+        ("comments", "under 3 within 600, improve engagement tactics"),
     ]
 
     agent = create_trigger_parser()
@@ -148,5 +158,5 @@ if __name__ == "__main__":
     for condition, prompt in test_cases:
         print(f"📝 Input: condition='{condition}', prompt='{prompt}'")
         result = agent.parse(condition, prompt)
-        print(f"✅ Output: value={result.value}, comparison='{result.comparison}', prompt='{result.prompt}'")
+        print(f"✅ Output: value={result.value}, comparison='{result.comparison}', duration={result.duration}, prompt='{result.prompt}'")
         print()
