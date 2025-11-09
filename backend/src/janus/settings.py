@@ -25,7 +25,12 @@ SECRET_KEY = "django-insecure-uja$r6=d^wg6j97ha7m-r=r(md@b@x52ait*&tne^h_j&ka(+n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'trustthe.tech',
+    '45.32.216.225',  # Production server IP
+]
 
 
 # Application definition
@@ -180,10 +185,12 @@ AGENT_SETTINGS = {
 }
 
 # CORS Configuration
-# Allow frontend (localhost:3000) to access the API
+# Allow frontend (localhost:3000 and production) to access the API
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://trustthe.tech",  # Production frontend
+    "https://trustthe.tech",  # Production frontend (HTTPS)
 ]
 
 # Allow credentials (cookies, authorization headers)
