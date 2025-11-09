@@ -285,6 +285,28 @@ export async function selectVariant(pk: string, variantId: string): Promise<void
 }
 
 /**
+ * Send trigger for a node - sends POST request with node pk and trigger type
+ */
+export async function sendTrigger(pk: number, trigger: 'like' | 'retweet'): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/trigger/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pk, trigger }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to send trigger: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error sending trigger:', error);
+    throw error;
+  }
+}
+
+/**
  * Mock function for development/testing
  * Remove this when connecting to real backend
  */
@@ -346,6 +368,7 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
         likes: 34700,
         retweets: 8300,
         impressions: 54600,
+        comments: 22400,
       },
       {
         pk: 2,
@@ -354,6 +377,7 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
         likes: 34700,
         retweets: 8300,
         impressions: 34600,
+        comments: 22400,
       },
       {
         pk: 3,
@@ -362,6 +386,7 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
         likes: 34700,
         retweets: 8300,
         impressions: 34600,
+        comments: 22400,
       },
       {
         pk: 4,
@@ -370,6 +395,7 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
         likes: 34700,
         retweets: 8300,
         impressions: 54600,
+        comments: 22400,
       },
     ],
     changes: false,

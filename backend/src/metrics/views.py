@@ -58,6 +58,7 @@ def nodesJSON(request):
 			"likes": m.likes if m else 0,
 			"retweets": m.retweets if m else 0,
 			"impressions": m.impressions if m else 0,
+			"comments": m.comments if m else 0,
 		})
 
 	return Response({
