@@ -28,7 +28,7 @@ def getMetricsDB():
 	return out
 
 ###### FOR AI AGENT TO DETERMINE NEW DIRECTION/STRATEGY ######
-def getPostDetailsDB(pk):
+def getMetricsAI(pk):
 	post = Post.objects.get(pk=pk)
 	metrics = post.metrics
 	output = {
