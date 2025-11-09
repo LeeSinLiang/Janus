@@ -11,11 +11,14 @@ class PostMetricsSerializer(serializers.ModelSerializer):
 
 class PostSerializer(serializers.ModelSerializer):
     assets_ready = serializers.SerializerMethodField()
+    has_trigger = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
-        fields = ('pk', 'title', 'description', 'next_posts', 'phase', 'status', 'assets_ready')
+        fields = ('pk', 'title', 'description', 'next_posts', 'phase', 'status', 'assets_ready', 'has_trigger')
 
+    def get_has_trigger(self, obj):
+        return obj.trigger_condition is not None
     def get_assets_ready(self, obj):
         """Check if both variant A and B have assets (images) ready"""
         try:
