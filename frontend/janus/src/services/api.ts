@@ -289,7 +289,7 @@ export async function selectVariant(pk: string, variantId: string): Promise<void
  */
 export async function sendTrigger(pk: number, trigger: 'like' | 'retweet'): Promise<void> {
   try {
-    const response = await fetch(`${API_BASE_URL}/trigger/`, {
+    const response = await fetch(`${API_BASE_URL}/setTrigger/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
