@@ -98,8 +98,8 @@ export function diffGraphData(
  * Check if node data has changed (title, description, metrics, or tags)
  */
 function hasNodeDataChanged(oldNode: Node, newNode: Node): boolean {
-  const oldData = oldNode.data;
-  const newData = newNode.data;
+  const oldData = oldNode.data as any;
+  const newData = newNode.data as any;
 
   // Compare tags array
   const tagsChanged = !areTagsEqual(oldData?.tags, newData?.tags);
