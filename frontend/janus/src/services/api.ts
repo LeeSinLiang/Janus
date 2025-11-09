@@ -397,23 +397,35 @@ export async function fetchCampaigns(): Promise<CampaignsResponse> {
 
 /**
  * Check triggers - sends GET request to check if any triggers should fire
+ * Returns trigger data if conditions are met
  */
-export async function checkTrigger(campaignId?: string): Promise<void> {
+export async function checkTrigger(campaignId?: string): Promise<{
+  triggered_posts: any[];
+  count: number;
+  message: string;
+} | null> {
   try {
     const url = new URL(`${API_BASE_URL}/checkTrigger/`);
     if (campaignId) {
       url.searchParams.append('campaign_id', campaignId);
     }
 
-    await fetch(url.toString(), {
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     });
-    // Silent check - no error handling needed
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return data;
   } catch (error) {
     // Silently fail - this is a background check
+    return null;
   }
 }
 

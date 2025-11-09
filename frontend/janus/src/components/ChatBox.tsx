@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Node } from '@xyflow/react';
 import { parseTrigger, sendMultiNodePrompt } from '@/services/api';
+import TypingText from './TypingText';
 
 interface RejectionState {
   nodeId: string;
@@ -34,12 +35,28 @@ export default function ChatBox({
   const [commandPosition, setCommandPosition] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Typing animation state
+  const [showRequestSent, setShowRequestSent] = useState(false);
+  const [typingKey, setTypingKey] = useState(0); // Force re-render of typing animation
+
   // Auto-focus textarea when rejection mode is activated
   useEffect(() => {
     if (rejectionState && textareaRef.current) {
       textareaRef.current.focus();
     }
   }, [rejectionState]);
+
+  // Reset to default message after 15 seconds
+  useEffect(() => {
+    if (showRequestSent) {
+      const timer = setTimeout(() => {
+        setShowRequestSent(false);
+        setTypingKey(prev => prev + 1); // Force re-render typing animation
+      }, 15000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showRequestSent]);
 
   // Extract node titles for the mention menu
   const nodeOptions = nodes.map((node) => ({
@@ -147,6 +164,10 @@ export default function ChatBox({
   // Handle message submission
   const handleSubmit = async () => {
     if (!message.trim()) return;
+
+    // Trigger typing animation
+    setShowRequestSent(true);
+    setTypingKey(prev => prev + 1);
 
     if (rejectionState) {
       // In rejection mode - submit rejection
@@ -314,9 +335,25 @@ export default function ChatBox({
           <div className="mb-3">
             <span className="text-base font-semibold text-[#FCD34D]">Janus:</span>
             <span className="ml-2 text-sm text-zinc-700">
-              {selectedNodeIds.size > 0
-                ? `${selectedNodeIds.size} node${selectedNodeIds.size > 1 ? 's' : ''} selected. What would you like to improve?`
-                : 'How can I help with your marketing roadmap?'}
+              {showRequestSent ? (
+                <TypingText
+                  key={`request-sent-${typingKey}`}
+                  text="Request Sent!"
+                  speed={40}
+                  className="text-sm text-zinc-700"
+                />
+              ) : (
+                <TypingText
+                  key={`default-${typingKey}`}
+                  text={
+                    selectedNodeIds.size > 0
+                      ? `${selectedNodeIds.size} node${selectedNodeIds.size > 1 ? 's' : ''} selected. What would you like to improve?`
+                      : 'How can I help with your marketing roadmap?'
+                  }
+                  speed={40}
+                  className="text-sm text-zinc-700"
+                />
+              )}
             </span>
           </div>
         )}

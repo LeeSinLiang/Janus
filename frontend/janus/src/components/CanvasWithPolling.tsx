@@ -26,6 +26,7 @@ import EngagementLineChart from './EngagementLineChart';
 import EngagementPieChart from './EngagementPieChart';
 import CampaignStatusBar from './CampaignStatusBar';
 import PostMetricsBox from './PostMetricsBox';
+import TriggerNotification from './TriggerNotification';
 import { useGraphData } from '@/hooks/useGraphData';
 import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost, approveAllNodes, checkTrigger, getXPostMetrics } from '@/services/api';
 import { Node as FlowNode } from '@xyflow/react';
@@ -68,6 +69,14 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
   // Approve all loading state
   const [isApprovingAll, setIsApprovingAll] = useState(false);
 
+  // Trigger notification state
+  const [triggerNotification, setTriggerNotification] = useState<{
+    triggered_posts: any[];
+    count: number;
+    message: string;
+    status: 'triggering' | 'completed';
+  } | null>(null);
+
   // Phase data
   const phases = [
     { name: 'Phase 1', dateRange: '(11 / 01 - 11 / 07)', isActive: activePhase === 0 },
@@ -85,12 +94,82 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
 
   // Check triggers every 20 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      checkTrigger(campaignId || undefined);
+    const interval = setInterval(async () => {
+      const result = await checkTrigger(campaignId || undefined);
+      if (result && result.count > 0) {
+        setTriggerNotification({
+          ...result,
+          status: 'triggering',
+        });
+      }
     }, 20000);
 
     return () => clearInterval(interval);
   }, [campaignId]);
+
+  // Poll for asset readiness when notification is in 'triggering' state
+  // Specifically checks LATEST REGENERATED variants (not all variants)
+  useEffect(() => {
+    if (!triggerNotification || triggerNotification.status !== 'triggering') {
+      return;
+    }
+
+    const checkAssetsReady = async () => {
+      try {
+        // Check each triggered post for asset readiness
+        const assetChecks = await Promise.all(
+          triggerNotification.triggered_posts.map(async (post) => {
+            try {
+              const variantsData = await fetchVariants(post.post_pk);
+              if (!variantsData || !variantsData.variants) {
+                return false;
+              }
+
+              // Find the LATEST regenerated variants (A and B) - sorted by created_at DESC
+              const latestRegeneratedA = variantsData.variants
+                .filter((v: any) => v.variant_id === 'A' && v.metadata?.regenerated === true)
+                .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+              const latestRegeneratedB = variantsData.variants
+                .filter((v: any) => v.variant_id === 'B' && v.metadata?.regenerated === true)
+                .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+              // Check if both latest regenerated variants exist and have assets
+              const hasAssetA = latestRegeneratedA && latestRegeneratedA.asset;
+              const hasAssetB = latestRegeneratedB && latestRegeneratedB.asset;
+
+              console.log(`[Asset Check] Post ${post.post_pk}: A=${!!hasAssetA}, B=${!!hasAssetB}`);
+
+              return hasAssetA && hasAssetB;
+            } catch (error) {
+              console.error(`[Asset Check] Error checking post ${post.post_pk}:`, error);
+              return false;
+            }
+          })
+        );
+
+        // If all triggered posts have LATEST REGENERATED assets ready, update status to 'completed'
+        const allAssetsReady = assetChecks.every(ready => ready === true);
+
+        console.log(`[Asset Check] All assets ready: ${allAssetsReady}`, assetChecks);
+
+        if (allAssetsReady) {
+          console.log('[Asset Check] ✅ All regenerated assets ready! Switching to green notification');
+          setTriggerNotification(prev => prev ? { ...prev, status: 'completed' } : null);
+        }
+      } catch (error) {
+        console.error('[Asset Check] Error checking asset readiness:', error);
+      }
+    };
+
+    // Poll every 3 seconds while in 'triggering' state
+    const interval = setInterval(checkAssetsReady, 3000);
+
+    // Also check immediately
+    checkAssetsReady();
+
+    return () => clearInterval(interval);
+  }, [triggerNotification]); // Only depends on triggerNotification, not nodes
 
   // Handle Escape key to clear node selections
   useEffect(() => {
@@ -551,6 +630,17 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
             )}
           </div>
         </div>
+      )}
+
+      {/* Trigger Notification */}
+      {triggerNotification && triggerNotification.count > 0 && (
+        <TriggerNotification
+          triggeredPosts={triggerNotification.triggered_posts}
+          count={triggerNotification.count}
+          status={triggerNotification.status}
+          onDismiss={() => setTriggerNotification(null)}
+          autoDismissDelay={triggerNotification.status === 'completed' ? 8000 : 0}
+        />
       )}
     </div>
   );

@@ -152,11 +152,10 @@ def regenerate_content_background(triggered_post_data):
 	Background task to regenerate content for a triggered post.
 
 	This function:
-	1. Analyzes metrics with trigger context
-	2. Regenerates improved A/B content variants
-	3. Generates media assets for new variants
-	4. Updates post status to draft for user review
-	5. Clears trigger configuration
+	1. Clears trigger configuration and sets status to draft (prevents duplicate triggers)
+	2. Analyzes metrics with trigger context
+	3. Regenerates improved A/B content variants
+	4. Generates media assets for new variants
 
 	Args:
 		triggered_post_data: Dict with post_pk, trigger details, metrics, etc.
@@ -176,6 +175,22 @@ def regenerate_content_background(triggered_post_data):
 			return Post.objects.get(pk=triggered_post_data["post_pk"])
 
 		post = retry_on_db_lock(get_post)
+
+		# IMMEDIATELY clear trigger config and set status to draft to prevent duplicate triggers
+		# This happens BEFORE expensive operations (analysis, content generation, image generation)
+		def clear_trigger_and_update_status():
+			with transaction.atomic():
+				p = Post.objects.get(pk=post.pk)
+				p.status = 'draft'
+				p.trigger_condition = None
+				p.trigger_value = None
+				p.trigger_comparison = None
+				p.trigger_prompt = None
+				p.trigger_duration = None
+				p.save()
+
+		retry_on_db_lock(clear_trigger_and_update_status)
+		print(f"[Trigger] ✓ Cleared trigger config for post {post.pk} to prevent duplicate firing")
 
 		# Build metrics data for analysis
 		metrics_data = {
@@ -291,19 +306,6 @@ def regenerate_content_background(triggered_post_data):
 			print(f"[Trigger] Generated media for variant B")
 		except Exception as e:
 			print(f"[Trigger] Warning: Failed to generate image for variant B: {e}")
-
-		# Step 6: Update post status and clear trigger
-		def update_post_status():
-			with transaction.atomic():
-				p = Post.objects.get(pk=post.pk)
-				p.status = 'draft'
-				p.trigger_condition = None
-				p.trigger_value = None
-				p.trigger_comparison = None
-				p.trigger_prompt = None
-				p.save()
-
-		retry_on_db_lock(update_post_status)
 
 		print(f"✅ [Trigger] Successfully regenerated content for post {post.pk} ({post.title})")
 		print(f"   New Variant A: {content_output.A[:50]}...")
