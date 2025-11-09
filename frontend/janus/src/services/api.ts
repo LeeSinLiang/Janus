@@ -339,6 +339,23 @@ export async function sendTrigger(pk: number, trigger: 'like' | 'retweet'): Prom
 }
 
 /**
+ * Check triggers - sends GET request to check if any triggers should fire
+ */
+export async function checkTrigger(): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/checkTrigger/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    // Silent check - no error handling needed
+  } catch (error) {
+    // Silently fail - this is a background check
+  }
+}
+
+/**
  * Mock function for development/testing
  * Remove this when connecting to real backend
  */
