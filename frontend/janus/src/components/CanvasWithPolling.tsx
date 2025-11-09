@@ -25,6 +25,7 @@ import WelcomeBar from './WelcomeBar';
 import EngagementLineChart from './EngagementLineChart';
 import EngagementPieChart from './EngagementPieChart';
 import CampaignStatusBar from './CampaignStatusBar';
+import PostMetricsBox from './PostMetricsBox';
 import { useGraphData } from '@/hooks/useGraphData';
 import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost, approveAllNodes } from '@/services/api';
 import { Node as FlowNode } from '@xyflow/react';
@@ -72,7 +73,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
 
   // Fetch graph data with automatic polling and diff-based updates
   // The hook now handles all diffing internally and preserves positions
-  const { nodes, edges, loading, error, setNodes, setEdges, campaign } = useGraphData({
+  const { nodes, edges, postMetrics, loading, error, setNodes, setEdges, campaign } = useGraphData({
     pollingInterval: 5000,
     useMockData: false, // Set to false when connecting to real backend
     campaignId: campaignId, // Pass campaign ID from props
@@ -457,7 +458,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
       ) : (
         /* Chart View */
         <div className="h-full w-full overflow-y-auto bg-gray-50 px-8 pt-24 pb-8">
-          <div className="mx-auto max-w-7xl space-y-6">
+          <div className="mx-auto space-y-6" style={{ maxWidth: '1800px' }}>
             {/* Welcome Bar */}
             <WelcomeBar />
 
@@ -469,6 +470,15 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
               {/* Pie Chart */}
               <EngagementPieChart />
             </div>
+
+            {/* Post Metrics Boxes - 4 columns single row */}
+            {postMetrics.length > 0 && (
+              <div className="grid grid-cols-4 gap-3 lg:grid-cols-4">
+                {postMetrics.map((post) => (
+                  <PostMetricsBox key={post.pk} post={post} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

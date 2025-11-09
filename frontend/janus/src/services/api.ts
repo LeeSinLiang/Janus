@@ -46,6 +46,7 @@ export async function fetchGraphDataV1(campaignId?: string): Promise<GraphRespon
     return {
       diagram: data.diagram || [],
       metrics: metricsWithNumberKeys,
+      post_metrics: data.post_metrics || [],
       campaign: data.campaign || null,
       changes: true, // Always process on fetch
     };
@@ -316,6 +317,28 @@ export async function selectVariant(pk: string, variantId: string): Promise<void
 }
 
 /**
+ * Send trigger for a node - sends POST request with node pk and trigger type
+ */
+export async function sendTrigger(pk: number, trigger: 'like' | 'retweet'): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/setTrigger/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pk, trigger }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to send trigger: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error sending trigger:', error);
+    throw error;
+  }
+}
+
+/**
  * Mock function for development/testing
  * Remove this when connecting to real backend
  */
@@ -369,6 +392,44 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
       4: { likes: 56, impressions: 890, retweets: 10 },
       5: { likes: 180, impressions: 2500, retweets: 85 },
     },
+    post_metrics: [
+      {
+        pk: 1,
+        title: 'X post 1',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        likes: 34700,
+        retweets: 8300,
+        impressions: 54600,
+        comments: 22400,
+      },
+      {
+        pk: 2,
+        title: 'X post 2',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        likes: 34700,
+        retweets: 8300,
+        impressions: 34600,
+        comments: 22400,
+      },
+      {
+        pk: 3,
+        title: 'X post 3',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        likes: 34700,
+        retweets: 8300,
+        impressions: 34600,
+        comments: 22400,
+      },
+      {
+        pk: 4,
+        title: 'X post 4',
+        description: 'Create an Instagram carousel post (5 slides) highlighting our top features.',
+        likes: 34700,
+        retweets: 8300,
+        impressions: 54600,
+        comments: 22400,
+      },
+    ],
     campaign: {
       campaign_id: 'mock_campaign_1',
       name: 'Mock Campaign',

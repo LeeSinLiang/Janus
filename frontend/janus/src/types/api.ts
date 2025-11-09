@@ -24,9 +24,20 @@ export interface CampaignInfo {
   description: string;
 }
 
+export interface PostMetrics {
+  pk: number;
+  title: string;
+  description: string;
+  likes: number;
+  retweets: number;
+  impressions: number;
+  comments: number;
+}
+
 export interface GraphResponse {
   diagram: DiagramNode[];
   metrics: Record<number, NodeMetrics>; // Object with pk as key
+  post_metrics?: PostMetrics[]; // First 4 published posts with metrics
   changes: boolean;
   campaign?: CampaignInfo | null;
 }

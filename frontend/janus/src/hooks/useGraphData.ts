@@ -5,6 +5,7 @@ import { Node, Edge } from '@xyflow/react';
 import { fetchGraphData, fetchGraphDataMock, fetchGraphDataV1, fetchGraphDataV2, getXPostMetrics } from '@/services/api';
 import { parseGraphData } from '@/utils/graphParser';
 import { diffGraphData, applyGraphDiff } from '@/utils/graphDiff';
+import { PostMetrics } from '@/types/api';
 import { CampaignInfo } from '@/types/api';
 
 interface UseGraphDataOptions {
@@ -16,6 +17,7 @@ interface UseGraphDataOptions {
 interface UseGraphDataReturn {
   nodes: Node[];
   edges: Edge[];
+  postMetrics: PostMetrics[];
   loading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
@@ -38,6 +40,7 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
 
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [postMetrics, setPostMetrics] = useState<PostMetrics[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const [campaign, setCampaign] = useState<CampaignInfo | null>(null);
@@ -79,6 +82,16 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
         setCampaign(data.campaign);
       } else {
         console.log('[useGraphData] Campaign data missing or component unmounted');
+      }
+
+      // Update post metrics if available
+      if (data.post_metrics && isMountedRef.current) {
+        setPostMetrics(data.post_metrics);
+      }
+
+      // Update post metrics if available
+      if (data.post_metrics && isMountedRef.current) {
+        setPostMetrics(data.post_metrics);
       }
 
       // Always load data on initial fetch, then check changes flag for subsequent polls
@@ -199,6 +212,7 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
   return {
     nodes,
     edges,
+    postMetrics,
     loading,
     error,
     refetch,

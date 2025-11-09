@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Node } from '@xyflow/react';
+import { sendTrigger } from '@/services/api';
 
 interface RejectionState {
   nodeId: string;
@@ -23,8 +24,10 @@ export default function ChatBox({
 }: ChatBoxProps) {
   const [message, setMessage] = useState('');
   const [showMentionMenu, setShowMentionMenu] = useState(false);
+  const [showCommandMenu, setShowCommandMenu] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mentionPosition, setMentionPosition] = useState(0);
+  const [commandPosition, setCommandPosition] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-focus textarea when rejection mode is activated
@@ -40,30 +43,52 @@ export default function ChatBox({
     title: (node.data?.title as string) || 'Untitled',
   }));
 
-  // Handle @ detection
+  // Command options for / menu
+  const commandOptions = [
+    { id: 'like', label: '1 like', value: '1 like' },
+    { id: 'retweet', label: '1 retweet', value: '1 retweet' },
+  ];
+
+  // Handle @ and / detection
   const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     const cursorPosition = e.target.selectionStart;
 
     setMessage(value);
 
-    // Check if @ was just typed
     const beforeCursor = value.slice(0, cursorPosition);
-    const lastAtIndex = beforeCursor.lastIndexOf('@');
 
+    // Check for / command
+    const lastSlashIndex = beforeCursor.lastIndexOf('/');
+    if (lastSlashIndex !== -1) {
+      const afterSlash = beforeCursor.slice(lastSlashIndex + 1);
+      // Show command menu if / is at the start or after a space, and no space after /
+      if ((lastSlashIndex === 0 || beforeCursor[lastSlashIndex - 1] === ' ') && !afterSlash.includes(' ')) {
+        setShowCommandMenu(true);
+        setCommandPosition(lastSlashIndex);
+        setShowMentionMenu(false);
+        setSelectedIndex(0);
+        return;
+      }
+    }
+
+    // Check for @ mention
+    const lastAtIndex = beforeCursor.lastIndexOf('@');
     if (lastAtIndex !== -1) {
       const afterAt = beforeCursor.slice(lastAtIndex + 1);
       // Show menu if @ is at the start or after a space, and no space after @
       if ((lastAtIndex === 0 || beforeCursor[lastAtIndex - 1] === ' ') && !afterAt.includes(' ')) {
         setShowMentionMenu(true);
         setMentionPosition(lastAtIndex);
+        setShowCommandMenu(false);
         setSelectedIndex(0);
-      } else {
-        setShowMentionMenu(false);
+        return;
       }
-    } else {
-      setShowMentionMenu(false);
     }
+
+    // Close both menus if neither condition is met
+    setShowMentionMenu(false);
+    setShowCommandMenu(false);
   };
 
   // Handle keyboard navigation
@@ -84,6 +109,22 @@ export default function ChatBox({
       return;
     }
 
+    if (showCommandMenu) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % commandOptions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + commandOptions.length) % commandOptions.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        selectCommand(commandOptions[selectedIndex]);
+      } else if (e.key === 'Escape') {
+        setShowCommandMenu(false);
+      }
+      return;
+    }
+
     // Handle Enter key for message submission
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -98,7 +139,7 @@ export default function ChatBox({
   };
 
   // Handle message submission
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!message.trim()) return;
 
     if (rejectionState) {
@@ -106,7 +147,32 @@ export default function ChatBox({
       onRejectionSubmit?.(message.trim());
       setMessage('');
     } else {
-      // Normal message mode - handle normally (you can implement this later)
+      // Normal message mode - parse for trigger
+      // Extract node title from **Node Title** format
+      const nodeMatch = message.match(/\*\*([^*]+)\*\*/);
+      const nodeTitle = nodeMatch ? nodeMatch[1] : null;
+
+      // Extract trigger from **1 like** or **1 retweet** format
+      const triggerMatch = message.match(/\*\*(1 (like|retweet))\*\*/);
+      const triggerText = triggerMatch ? triggerMatch[2] : null;
+
+      // If both node and trigger found, send trigger request
+      if (nodeTitle && triggerText) {
+        // Find node pk by title
+        const node = nodeOptions.find(n => n.title === nodeTitle);
+        if (node) {
+          const nodePk = parseInt(node.id);
+          const trigger = triggerText as 'like' | 'retweet';
+
+          try {
+            await sendTrigger(nodePk, trigger);
+            console.log(`Trigger sent: ${trigger} for node ${nodePk}`);
+          } catch (error) {
+            console.error('Failed to send trigger:', error);
+          }
+        }
+      }
+
       console.log('Sin is so corny bhai macha:', message);
       setMessage('');
     }
@@ -120,9 +186,25 @@ export default function ChatBox({
     // Remove any partial typing after @
     const cleanAfter = afterMention.replace(/^[^\s]*/, '');
 
-    const newMessage = `${beforeMention}[${node.title}] ${cleanAfter}`.trim() + ' ';
+    const newMessage = `${beforeMention}**${node.title}** ${cleanAfter}`.trim() + ' ';
     setMessage(newMessage);
     setShowMentionMenu(false);
+
+    // Focus back on textarea
+    textareaRef.current?.focus();
+  };
+
+  // Select a command from the menu
+  const selectCommand = (command: { id: string; label: string; value: string }) => {
+    const beforeCommand = message.slice(0, commandPosition);
+    const afterCommand = message.slice(commandPosition + 1);
+
+    // Remove any partial typing after /
+    const cleanAfter = afterCommand.replace(/^[^\s]*/, '');
+
+    const newMessage = `${beforeCommand}**${command.value}** ${cleanAfter}`.trim() + ' ';
+    setMessage(newMessage);
+    setShowCommandMenu(false);
 
     // Focus back on textarea
     textareaRef.current?.focus();
@@ -135,11 +217,14 @@ export default function ChatBox({
       if (showMentionMenu && textareaRef.current && !textareaRef.current.contains(target)) {
         setShowMentionMenu(false);
       }
+      if (showCommandMenu && textareaRef.current && !textareaRef.current.contains(target)) {
+        setShowCommandMenu(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMentionMenu]);
+  }, [showMentionMenu, showCommandMenu]);
 
   return (
     <div className="w-full px-6 py-4">
@@ -191,9 +276,12 @@ export default function ChatBox({
 
         {/* Context button */}
         {!rejectionState && (
-          <div className="mb-2">
+          <div className="mb-2 flex gap-2">
             <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
               @ to add context
+            </button>
+            <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
+              / for commands
             </button>
           </div>
         )}
@@ -229,6 +317,27 @@ export default function ChatBox({
                     }`}
                   >
                     {node.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Command Menu */}
+          {showCommandMenu && commandOptions.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-2 w-48 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg">
+              <div className="max-h-48 overflow-y-auto">
+                {commandOptions.map((command, index) => (
+                  <button
+                    key={command.id}
+                    onClick={() => selectCommand(command)}
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                      index === selectedIndex
+                        ? 'bg-blue-50 text-blue-900'
+                        : 'text-zinc-900 hover:bg-zinc-50'
+                    }`}
+                  >
+                    {command.label}
                   </button>
                 ))}
               </div>

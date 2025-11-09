@@ -13,4 +13,6 @@ urlpatterns = [
     path('api/approveAll', views.approveAllNodes, name='approveAllNodes'),
     path('api/graph', views.rejectNode, name='rejectNode'),
 
+    path('setTrigger/', views.setTrigger, name='setTrigger'),
+    
 ]
