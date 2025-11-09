@@ -66,10 +66,10 @@ def checkTrigger(request):
 	triggeredPosts = []
 	for post in publishedPosts:
 		if (post.trigger == "like"):
-			if (post.metrics.likes >= 1):
+			if (post.metrics.likes < 1):
 				triggeredPosts.append(post.pk)
 		elif (post.trigger == "retweet"):
-			if (post.metrics.retweets >= 1):
+			if (post.metrics.retweets < 1):
 				triggeredPosts.append(post.pk)
 	
 	if (triggeredPosts):
@@ -146,16 +146,18 @@ def createXPost(request):
 	if post.selected_variant:
 		variant = ContentVariant.objects.filter(variant_id=post.selected_variant, post=post).first()
 		text = variant.content if variant else post.description
+		media_name = getattr(getattr(variant, "asset", None), "name", None)
 	else:
 		variant = ContentVariant.objects.filter(variant_id="B", post=post).first()
 		text = variant.content if variant else post.description
+		media_name = getattr(getattr(variant, "asset", None), "name", None)
 
 	# Use clone API instead of real Twitter API
 	url = f"http://localhost:8000/clone/2/tweets"
 	headers = {
 		"Content-Type": "application/json"
 	}
-	body = {"text": text}
+	body = {"text": text, "media": media_name}
 
 	resp = requests.post(url, headers=headers, json=body)
 	data = resp.json()

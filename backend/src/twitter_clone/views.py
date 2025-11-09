@@ -2,9 +2,11 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework import status
+from agents.models import Post
 from django.contrib.auth.models import User
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_http_methods
+from django.core.files.storage import default_storage
 
 from .models import CloneTweet, CloneLike, CloneRetweet, CloneComment, CloneImpression
 from .serializers import (
@@ -24,29 +26,54 @@ def create_tweet(request):
     Accepts: text (required), media (optional), media_video (optional)
     Returns: {"data": {"id": "...", "text": "..."}}
     """
-    serializer = TwitterAPIv2CreateTweetSerializer(data=request.data)
+    text = request.data.get('text', '')
+    media = request.data.get('media').strip()
 
-    if serializer.is_valid():
-        # Get or create default user
-        user, _ = User.objects.get_or_create(
-            id=1,
-            defaults={'username': 'default_user', 'email': 'default@example.com'}
-        )
+    user, _ = User.objects.get_or_create(id=1, defaults={'username': 'default_user'})
+    tweet = CloneTweet.objects.create(text=text, author=user)
 
-        # Create tweet
-        tweet = serializer.save(author=user)
+    if media:
+        if not default_storage.exists(media):
+            return Response({"errors": {"media": [f"File not found: {media}"]}},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        # Return response in Twitter API v2 format
-        response_serializer = TwitterAPIv2TweetResponseSerializer(tweet)
-        return Response(
-            {"data": response_serializer.data},
-            status=status.HTTP_201_CREATED
-        )
+        low = media.lower()
+        if low.endswith(".png"):
+            tweet.media_image.name = media   # point field to existing file
+            tweet.media_type = 'image'
+        elif low.endswith(".mp4"):
+            tweet.media_video.name = media
+            tweet.media_type = 'video'
+        else:
+            return Response({"errors": {"media": ["Unsupported file extension."]}},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-    return Response(
-        {"errors": serializer.errors},
-        status=status.HTTP_400_BAD_REQUEST
-    )
+        tweet.save()
+
+    return Response({"data": {"id": tweet.tweet_id, "text": tweet.text}}, status=status.HTTP_201_CREATED)
+    # serializer = TwitterAPIv2CreateTweetSerializer(data=request.data)
+
+    # if serializer.is_valid():
+    #     # Get or create default user
+    #     user, _ = User.objects.get_or_create(
+    #         id=1,
+    #         defaults={'username': 'default_user', 'email': 'default@example.com'}
+    #     )
+
+    #     # Create tweet
+    #     tweet = serializer.save(author=user)
+
+    #     # Return response in Twitter API v2 format
+    #     response_serializer = TwitterAPIv2TweetResponseSerializer(tweet)
+    #     return Response(
+    #         {"data": response_serializer.data},
+    #         status=status.HTTP_201_CREATED
+    #     )
+
+    # return Response(
+    #     {"errors": serializer.errors},
+    #     status=status.HTTP_400_BAD_REQUEST
+    # )
 
 
 @api_view(['POST'])
