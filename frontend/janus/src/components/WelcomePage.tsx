@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateStrategy } from '@/services/api';
+import CampaignList from './CampaignList';
 
 export default function WelcomePage() {
   const router = useRouter();
@@ -61,14 +62,14 @@ export default function WelcomePage() {
   }
 
   return (
-    <div 
-      className="relative h-screen w-screen bg-gray-50 overflow-hidden"
+    <div
+      className="relative h-screen w-screen bg-gray-50 overflow-y-auto"
       style={{
         backgroundImage: 'radial-gradient(circle, #e5e7eb 1px, transparent 1px)',
         backgroundSize: '16px 16px'
       }}
     >
-      <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
         {/* Janus Logo */}
         <div className="mb-12">
           <h1 className="text-6xl font-bold text-orange-500">Janus</h1>
@@ -135,6 +136,9 @@ export default function WelcomePage() {
             </button>
           </div>
         </form>
+
+        {/* Campaign List */}
+        <CampaignList />
       </div>
     </div>
   );

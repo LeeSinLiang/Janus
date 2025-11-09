@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Node } from '@xyflow/react';
+import { sendTrigger, sendMultiNodePrompt } from '@/services/api';
 
 interface RejectionState {
   nodeId: string;
@@ -13,18 +14,24 @@ interface ChatBoxProps {
   rejectionState?: RejectionState | null;
   onRejectionSubmit?: (rejectMessage: string) => void;
   onCancelRejection?: () => void;
+  selectedNodeIds?: Set<string>;
+  onMultiNodeSubmit?: () => void;
 }
 
 export default function ChatBox({
   nodes,
   rejectionState,
   onRejectionSubmit,
-  onCancelRejection
+  onCancelRejection,
+  selectedNodeIds = new Set(),
+  onMultiNodeSubmit
 }: ChatBoxProps) {
   const [message, setMessage] = useState('');
   const [showMentionMenu, setShowMentionMenu] = useState(false);
+  const [showCommandMenu, setShowCommandMenu] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mentionPosition, setMentionPosition] = useState(0);
+  const [commandPosition, setCommandPosition] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-focus textarea when rejection mode is activated
@@ -40,30 +47,52 @@ export default function ChatBox({
     title: (node.data?.title as string) || 'Untitled',
   }));
 
-  // Handle @ detection
+  // Command options for / menu
+  const commandOptions = [
+    { id: 'like', label: '1 like', value: '1 like' },
+    { id: 'retweet', label: '1 retweet', value: '1 retweet' },
+  ];
+
+  // Handle @ and / detection
   const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     const cursorPosition = e.target.selectionStart;
 
     setMessage(value);
 
-    // Check if @ was just typed
     const beforeCursor = value.slice(0, cursorPosition);
-    const lastAtIndex = beforeCursor.lastIndexOf('@');
 
+    // Check for / command
+    const lastSlashIndex = beforeCursor.lastIndexOf('/');
+    if (lastSlashIndex !== -1) {
+      const afterSlash = beforeCursor.slice(lastSlashIndex + 1);
+      // Show command menu if / is at the start or after a space, and no space after /
+      if ((lastSlashIndex === 0 || beforeCursor[lastSlashIndex - 1] === ' ') && !afterSlash.includes(' ')) {
+        setShowCommandMenu(true);
+        setCommandPosition(lastSlashIndex);
+        setShowMentionMenu(false);
+        setSelectedIndex(0);
+        return;
+      }
+    }
+
+    // Check for @ mention
+    const lastAtIndex = beforeCursor.lastIndexOf('@');
     if (lastAtIndex !== -1) {
       const afterAt = beforeCursor.slice(lastAtIndex + 1);
       // Show menu if @ is at the start or after a space, and no space after @
       if ((lastAtIndex === 0 || beforeCursor[lastAtIndex - 1] === ' ') && !afterAt.includes(' ')) {
         setShowMentionMenu(true);
         setMentionPosition(lastAtIndex);
+        setShowCommandMenu(false);
         setSelectedIndex(0);
-      } else {
-        setShowMentionMenu(false);
+        return;
       }
-    } else {
-      setShowMentionMenu(false);
     }
+
+    // Close both menus if neither condition is met
+    setShowMentionMenu(false);
+    setShowCommandMenu(false);
   };
 
   // Handle keyboard navigation
@@ -84,6 +113,22 @@ export default function ChatBox({
       return;
     }
 
+    if (showCommandMenu) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % commandOptions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + commandOptions.length) % commandOptions.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        selectCommand(commandOptions[selectedIndex]);
+      } else if (e.key === 'Escape') {
+        setShowCommandMenu(false);
+      }
+      return;
+    }
+
     // Handle Enter key for message submission
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -98,15 +143,54 @@ export default function ChatBox({
   };
 
   // Handle message submission
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!message.trim()) return;
 
     if (rejectionState) {
       // In rejection mode - submit rejection
       onRejectionSubmit?.(message.trim());
       setMessage('');
+    } else if (selectedNodeIds.size > 0) {
+      // Multi-node selection mode - send to sintodo
+      const nodePks = Array.from(selectedNodeIds).map(id => parseInt(id));
+
+      try {
+        await sendMultiNodePrompt(nodePks, message.trim());
+        console.log(`Multi-node prompt sent for nodes: ${nodePks.join(', ')}`);
+
+        // Clear message and notify parent to clear selections
+        setMessage('');
+        onMultiNodeSubmit?.();
+      } catch (error) {
+        console.error('Failed to send multi-node prompt:', error);
+      }
     } else {
-      // Normal message mode - handle normally (you can implement this later)
+      // Normal message mode - parse for trigger
+      // Extract node title from **Node Title** format
+      const nodeMatch = message.match(/\*\*([^*]+)\*\*/);
+      const nodeTitle = nodeMatch ? nodeMatch[1] : null;
+
+      // Extract trigger from **1 like** or **1 retweet** format
+      const triggerMatch = message.match(/\*\*(1 (like|retweet))\*\*/);
+      const triggerText = triggerMatch ? triggerMatch[2] : null;
+
+      // If both node and trigger found, send trigger request
+      if (nodeTitle && triggerText) {
+        // Find node pk by title
+        const node = nodeOptions.find(n => n.title === nodeTitle);
+        if (node) {
+          const nodePk = parseInt(node.id);
+          const trigger = triggerText as 'like' | 'retweet';
+
+          try {
+            await sendTrigger(nodePk, trigger);
+            console.log(`Trigger sent: ${trigger} for node ${nodePk}`);
+          } catch (error) {
+            console.error('Failed to send trigger:', error);
+          }
+        }
+      }
+
       console.log('Sin is so corny bhai macha:', message);
       setMessage('');
     }
@@ -120,9 +204,25 @@ export default function ChatBox({
     // Remove any partial typing after @
     const cleanAfter = afterMention.replace(/^[^\s]*/, '');
 
-    const newMessage = `${beforeMention}[${node.title}] ${cleanAfter}`.trim() + ' ';
+    const newMessage = `${beforeMention}**${node.title}** ${cleanAfter}`.trim() + ' ';
     setMessage(newMessage);
     setShowMentionMenu(false);
+
+    // Focus back on textarea
+    textareaRef.current?.focus();
+  };
+
+  // Select a command from the menu
+  const selectCommand = (command: { id: string; label: string; value: string }) => {
+    const beforeCommand = message.slice(0, commandPosition);
+    const afterCommand = message.slice(commandPosition + 1);
+
+    // Remove any partial typing after /
+    const cleanAfter = afterCommand.replace(/^[^\s]*/, '');
+
+    const newMessage = `${beforeCommand}**${command.value}** ${cleanAfter}`.trim() + ' ';
+    setMessage(newMessage);
+    setShowCommandMenu(false);
 
     // Focus back on textarea
     textareaRef.current?.focus();
@@ -135,11 +235,14 @@ export default function ChatBox({
       if (showMentionMenu && textareaRef.current && !textareaRef.current.contains(target)) {
         setShowMentionMenu(false);
       }
+      if (showCommandMenu && textareaRef.current && !textareaRef.current.contains(target)) {
+        setShowCommandMenu(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMentionMenu]);
+  }, [showMentionMenu, showCommandMenu]);
 
   return (
     <div className="w-full px-6 py-4">
@@ -184,16 +287,47 @@ export default function ChatBox({
           <div className="mb-3">
             <span className="text-base font-semibold text-[#FCD34D]">Janus:</span>
             <span className="ml-2 text-sm text-zinc-700">
-              How can I help with your marketing roadmap?
+              {selectedNodeIds.size > 0
+                ? `${selectedNodeIds.size} node${selectedNodeIds.size > 1 ? 's' : ''} selected. What would you like to improve?`
+                : 'How can I help with your marketing roadmap?'}
             </span>
           </div>
         )}
 
-        {/* Context button */}
+        {/* Context buttons and Send button */}
         {!rejectionState && (
-          <div className="mb-2">
-            <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
-              @ to add context
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex gap-2">
+              <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
+                @ to add context
+              </button>
+              <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
+                / for commands
+              </button>
+            </div>
+            {/* Send button */}
+            <button
+              onClick={handleSubmit}
+              className={`rounded-lg p-1.5 text-white transition-colors ${
+                selectedNodeIds.size > 0
+                  ? 'bg-purple-600 hover:bg-purple-700'
+                  : 'bg-zinc-900 hover:bg-zinc-700'
+              }`}
+              title={selectedNodeIds.size > 0 ? 'Send suggestion' : 'Send message'}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
             </button>
           </div>
         )}
@@ -205,10 +339,18 @@ export default function ChatBox({
             value={message}
             onChange={handleMessageChange}
             onKeyDown={handleKeyDown}
-            placeholder={rejectionState ? "Explain why you're rejecting this node..." : "Change triggers for marketing strategy..."}
+            placeholder={
+              rejectionState
+                ? "Explain why you're rejecting this node..."
+                : selectedNodeIds.size > 0
+                ? "Enter your suggestion for the selected nodes..."
+                : "Change triggers for marketing strategy..."
+            }
             className={`w-full resize-none rounded-lg border px-3 py-2 pr-32 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-1 ${
               rejectionState
                 ? 'border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-400'
+                : selectedNodeIds.size > 0
+                ? 'border-purple-300 bg-purple-50 focus:border-purple-400 focus:ring-purple-400'
                 : 'border-zinc-200 bg-white focus:border-zinc-300 focus:ring-zinc-300'
             }`}
             rows={rejectionState ? 3 : 1}
@@ -235,69 +377,28 @@ export default function ChatBox({
             </div>
           )}
 
-          {/* Bottom toolbar */}
-          <div className="mt-2 flex items-center justify-end">
-            <div className="flex items-right gap-2">
-              {/* Image icon */}
-              <button className="text-zinc-400 transition-colors hover:text-zinc-600">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-              </button>
-
-              {/* Video play icon */}
-              <button className="text-zinc-400 transition-colors hover:text-zinc-600">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-              </button>
-
-              {/* Send button */}
-              <button
-                onClick={handleSubmit}
-                className={`rounded-lg p-1.5 text-white transition-colors ${
-                  rejectionState
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-zinc-900 hover:bg-zinc-700'
-                }`}
-                title={rejectionState ? 'Submit rejection' : 'Send message'}
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </button>
+          {/* Command Menu */}
+          {showCommandMenu && commandOptions.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-2 w-48 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg">
+              <div className="max-h-48 overflow-y-auto">
+                {commandOptions.map((command, index) => (
+                  <button
+                    key={command.id}
+                    onClick={() => selectCommand(command)}
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                      index === selectedIndex
+                        ? 'bg-blue-50 text-blue-900'
+                        : 'text-zinc-900 hover:bg-zinc-50'
+                    }`}
+                  >
+                    {command.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          
         </div>
       </div>
     </div>

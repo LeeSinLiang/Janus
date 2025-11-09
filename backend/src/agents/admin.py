@@ -6,7 +6,7 @@ class ContentVariantInline(admin.TabularInline):
     """Inline admin for content variants"""
     model = ContentVariant
     extra = 0
-    fields = ('variant_id', 'content', 'platform', 'metadata')
+    fields = ('variant_id', 'content', 'platform', 'asset', 'metadata')
     readonly_fields = ('created_at',)
 
 
@@ -58,7 +58,7 @@ class PostAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Post Information', {
-            'fields': ('title', 'description', 'next_posts', 'post_id', 'campaign', 'phase', 'status', 'selected_variant')
+            'fields': ('title', 'description', 'next_posts', 'post_id', 'campaign', 'phase', 'status', 'selected_variant', 'trigger')
         }),
         ('Metrics', {
             'fields': ('metrics',),

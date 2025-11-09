@@ -1,0 +1,364 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+**Janus** is an AI-powered GTM (Go-To-Market) OS for technical founders. It's a full-stack application with:
+- **Backend**: Multi-agent system using LangChain + Google Gemini, Django REST Framework
+- **Frontend**: Next.js 16 + React 19 + ReactFlow for interactive campaign visualization
+- **Purpose**: Automates marketing strategy planning, A/B content generation, and metrics-driven optimization
+
+## Repository Structure
+
+```
+├── backend/              # Django backend with multi-agent system
+│   ├── src/
+│   │   ├── agents/       # Multi-agent system (LangChain + Gemini)
+│   │   ├── metrics/      # API endpoints for frontend polling
+│   │   ├── twitter_clone/# Mock Twitter API for testing
+│   │   ├── janus/        # Django project settings
+│   │   └── manage.py
+│   ├── demo.py           # CLI demo (strategy → content → media)
+│   ├── web_demo.py       # Flask web demo
+│   └── requirements.txt
+│
+├── frontend/janus/       # Next.js 16 frontend
+│   ├── src/
+│   │   ├── app/          # App router (Next.js 13+ pattern)
+│   │   ├── components/   # React components (Canvas, ChatBox, etc.)
+│   │   ├── services/     # API client (polling backend)
+│   │   ├── hooks/        # Custom React hooks
+│   │   ├── types/        # TypeScript definitions
+│   │   └── utils/        # Graph parsing, layout (Dagre)
+│   └── package.json
+│
+└── docs/                 # Auto-generated commit documentation
+```
+
+## Development Commands
+
+### Backend Setup
+```bash
+cd backend
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment variables
+cp .env.example .env
+# Edit .env and add:
+#   GOOGLE_API_KEY (required - from https://ai.google.dev/gemini-api/docs/api-key)
+#   MEDIA_GEMINI_API_KEY (optional - for image/video generation)
+
+# Run migrations
+cd src && python manage.py migrate
+
+# Start Django dev server (default: http://localhost:8000)
+python manage.py runserver
+```
+
+### Frontend Setup
+```bash
+cd frontend/janus
+
+# Install dependencies
+npm install
+
+# Start Next.js dev server (default: http://localhost:3000)
+npm run dev
+
+# Build for production
+npm run build
+npm start
+```
+
+### Testing & Demos
+
+**Backend Tests:**
+```bash
+# Test complete 3-scenario workflow (from backend/)
+python demo.py
+# Scenarios: Strategy → A/B Content → Metrics Analysis
+
+# Test Flask web demo with UI (from backend/)
+python web_demo.py
+# Opens browser UI for interactive demo
+
+# Test individual agents (from backend/src/)
+cd src
+python -m agents.supervisor        # Orchestrator agent
+python -m agents.content_creator   # A/B content generation
+python -m agents.strategy_planner  # Strategy + Mermaid diagrams
+python -m agents.media_creator     # Image/video generation
+python -m agents.metrics_analyzer  # Metrics analysis
+
+# Run Django tests
+python manage.py test agents
+```
+
+**Frontend Testing:**
+```bash
+cd frontend/janus
+npm run lint   # ESLint (configured)
+```
+
+### Django Commands
+```bash
+cd backend/src
+
+# Database
+python manage.py makemigrations
+python manage.py migrate
+python manage.py showmigrations
+
+# Admin
+python manage.py createsuperuser
+# Access admin at http://localhost:8000/admin/
+
+# Shell
+python manage.py shell
+```
+
+## Architecture
+
+### Backend: 3-Layer Multi-Agent Pattern (LangChain)
+
+**Layer 3: Orchestrator** (`agents/supervisor.py`)
+- Routes user requests to specialized agents
+- Sub-agents wrapped as `@tool` for LLM to call
+- Pattern: `create_agent()` with sub-agents as tools
+
+**Layer 2: Specialized Agents**
+- **Strategy Planner** (`strategy_planner.py`): Generates Mermaid diagrams with 3 phases
+- **Content Creator** (`content_creator.py`): A/B content variants (text + media prompts)
+- **Media Creator** (`media_creator.py`): Image generation (Imagen 3) or video generation (Veo 2)
+- **Metrics Analyzer** (`metrics_analyzer.py`): Performance analysis and recommendations
+- **X Platform** (`x_platform.py`): Twitter posting and scheduling operations
+
+**Layer 1: Tools** (`agents/tools.py`)
+- Low-level operations: `post_tweet`, `get_metrics`, `validate_tweet_format`
+- Uses placeholder data from `agents/data/placeholder_metrics.json`
+
+### Agent Implementation Patterns
+
+**Structured Output Agents** (strategy_planner, content_creator):
+```python
+from langchain.agents import create_agent
+from pydantic import BaseModel
+
+agent = create_agent(
+    model,
+    tools=[],
+    system_prompt="...",
+    response_format=PydanticModel  # Returns validated Pydantic object
+)
+result = agent.invoke({"messages": [{"role": "user", "content": input_text}]})
+output = result["messages"][-1]  # Pydantic object
+```
+
+**Tool-Based Agents** (x_platform, metrics_analyzer):
+```python
+agent = create_agent(
+    model,
+    tools=[tool1, tool2, tool3],
+    system_prompt="..."
+)
+result = agent.invoke({"messages": [{"role": "user", "content": input_text}]})
+output = result["messages"][-1].content  # String output
+```
+
+**Media Generation** (media_creator):
+```python
+# Image generation (Imagen 3)
+media_agent = create_media_creator('models/gemini-2.5-flash-image')
+result = media_agent.execute(prompt="...")  # Returns base64 image
+
+# Video generation (Veo 2)
+media_agent = create_media_creator('models/veo-3.1-generate-preview')
+result = media_agent.execute_video(prompt="...", duration=5)  # Returns video URL
+```
+
+### Django Apps
+
+**agents** - Multi-agent system
+- Models: `Campaign`, `Post`, `ContentVariant`, `AgentMemory`, `ConversationMessage`
+- API: `/api/agents/strategy/`, `/api/agents/campaigns/`
+- State management: `state.py` (database-backed, migrated from in-memory)
+- Admin interface: Full CRUD for all models
+
+**metrics** - Frontend polling endpoints
+- `/nodesJson/` - Returns campaign graph data (nodes + metrics)
+- `/getVariants/` - Fetch A/B variants for a post
+- `/selectVariant/` - Mark variant as selected
+- `/createXPost/` - Publish post to Twitter clone
+- `/api/approve`, `/api/graph` - Node approval/rejection workflow
+
+**twitter_clone** - Mock Twitter API
+- Mimics Twitter API v2 response format
+- Models: `CloneTweet`, `CloneLike`, `CloneRetweet`, `CloneComment`
+- Web UI at `/clone/` for visual testing
+- Supports text, image, and video posts
+
+**core** - Empty Django app (placeholder)
+
+### Frontend Architecture (Next.js 16 + React 19)
+
+**Key Components:**
+- `CanvasWithPolling`: Main canvas with ReactFlow + backend polling
+- `Canvas`: Static ReactFlow canvas without polling
+- `TaskCardNode`: Custom node component (title, description, status, metrics)
+- `ChatBox`: User input for creating campaigns
+- `NodeVariantModal`: A/B variant selection modal
+- `WelcomePage`: Onboarding/landing page
+- `EngagementLineChart`, `EngagementPieChart`: Metrics visualization
+
+**State Management:**
+- `useGraphData` hook: Polls `/nodesJson/` every 2 seconds for updates
+- Local state for nodes/edges (ReactFlow)
+- API calls via `services/api.ts`
+
+**Routing:**
+- `/` - Welcome page with campaign creation
+- `/canvas?campaign_id=X` - Interactive campaign editor
+
+**Data Flow:**
+1. User submits campaign via ChatBox
+2. Backend generates strategy (Mermaid diagram) → saves to DB
+3. Frontend polls `/nodesJson/` for updates
+4. ReactFlow renders nodes from parsed Mermaid
+5. User approves/rejects variants → backend generates new content
+6. Metrics displayed in real-time
+
+### Database Schema (Django ORM + SQLite)
+
+**Campaign:**
+- `campaign_id` (unique), `name`, `description`, `phase`, `status`
+- `strategy` (TextField) - Stores Mermaid diagram
+- `insights` (JSONField) - Marketing insights array
+- `metadata` (JSONField)
+
+**Post:**
+- `post_id`, `campaign` (FK), `title`, `description`, `phase`, `status`
+- `metrics` (JSONField) - Engagement data
+- `next_posts` (M2M) - Graph connections
+
+**ContentVariant:**
+- `variant_id`, `post` (FK), `content`, `platform`, `selected`
+- `asset` (FileField) - Image/video media
+- `metadata` (JSONField) - Media prompt, generation params
+
+**Mermaid Diagram Format:**
+```
+graph TB
+  subgraph "Phase 1"
+    NODE1[<title>Title</title><description>Desc</description>]
+    NODE2[<title>Title</title><description>Desc</description>]
+  end
+  subgraph "Phase 2"
+    NODE3[...]
+  end
+  subgraph "Phase 3"
+    NODE4[...]
+  end
+  NODE1 --> NODE3
+  NODE2 --> NODE3
+```
+
+Parsed by `agents/mermaid_parser.py` into nodes and connections.
+
+## Critical Implementation Notes
+
+### LangChain + Google Gemini
+
+**Model Initialization:**
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+model = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",  # NOT "google_genai:gemini-2.5-flash"
+    temperature=0.7
+)
+```
+
+**Common Pitfalls:**
+1. ❌ Don't use `init_chat_model()` or `AgentExecutor` (deprecated)
+2. ❌ Don't use `executor.invoke({"input": ...})` - use `agent.invoke({"messages": [...]})`
+3. ❌ Don't use `JsonOutputParser` chain - use `response_format=PydanticModel`
+4. ✅ Use `temperature=0` for structured output agents
+5. ✅ Cast `response.content` to `str()` to avoid list type issues
+
+### Environment Variables
+
+**Required:**
+- `GOOGLE_API_KEY` - For LangChain agents (Gemini Flash)
+
+**Optional:**
+- `MEDIA_GEMINI_API_KEY` - For Imagen 3 / Veo 2 media generation
+- `NEXT_PUBLIC_API_URL` - Frontend API endpoint (default: http://localhost:8000)
+
+### CORS Configuration
+
+Django settings include CORS headers for local development:
+```python
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+```
+
+## Common Workflows
+
+### Creating a New Agent
+
+1. Define Pydantic output schema (if structured output)
+2. Create agent class in `backend/src/agents/`
+3. Use `create_agent()` with `response_format` or `tools`
+4. Add factory function to `agents/__init__.py`
+5. Test with `python -m agents.your_agent`
+
+### Adding Frontend Component
+
+1. Create component in `frontend/janus/src/components/`
+2. Import in parent component or page
+3. Use TypeScript types from `types/api.ts`
+4. Update `services/api.ts` if new API endpoints needed
+
+### Extending Database Schema
+
+1. Edit models in `backend/src/agents/models.py`
+2. Run `python manage.py makemigrations`
+3. Run `python manage.py migrate`
+4. Update serializers if REST API affected
+5. Register new models in `agents/admin.py`
+
+## Testing Without Real APIs
+
+- **Twitter API**: Use `twitter_clone` app at `/clone/` for posting and metrics
+- **Metrics**: Placeholder data in `agents/data/placeholder_metrics.json`
+- **Media**: Demo scripts save to `backend/generated_videos/`
+
+## Performance Notes
+
+- Frontend polls backend every 2 seconds (`useGraphData`)
+- Database queries optimized with `.select_related()` and `.prefetch_related()`
+- Media files stored in `backend/src/media/` (served by Django in DEBUG mode)
+- ReactFlow layout uses Dagre for auto-positioning
+
+## Known Limitations
+
+- SQLite database (migrate to PostgreSQL for production)
+- No real Twitter API integration yet (uses mock clone)
+- Video generation is slow (~30-60 seconds per video)
+- No user authentication (single-user system currently)
+
+## Future Enhancements
+
+From `backend/notes/janus.md`:
+- Real X/Twitter API integration
+- ProductHunt API integration
+- Trigger detection engine (auto-swap underperforming variants)
+- Vector DB for semantic campaign search
+- PostgreSQL for production
+- ReactFlow canvas for visual campaign editing (partial - rendering only)
+- User authentication and multi-tenancy

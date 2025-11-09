@@ -396,6 +396,95 @@ Variant B video caption should describe dynamic motion and transitions."""
 
 
 # =====================
+# Helper Functions
+# =====================
+
+def save_content_variants_for_post(post, content_output: ContentOutput, media_agent, retry_on_db_lock):
+    """
+    Save content variants (A/B) for a given post with media generation.
+
+    This function:
+    1. Creates ContentVariant A and B records
+    2. Generates media assets for each variant
+    3. Saves assets to database
+    4. Uses retry logic for all database operations
+
+    Args:
+        post: Post object to create variants for
+        content_output: ContentOutput with A/B content and image captions
+        media_agent: Media creator agent for generating images
+        retry_on_db_lock: Function to retry database operations on lock errors
+
+    Returns:
+        tuple: (variant_a, variant_b) - Created ContentVariant objects
+    """
+    import base64
+    from django.core.files.base import ContentFile
+    from django.db import transaction
+
+    # Import ContentVariant model
+    from .models import ContentVariant
+
+    # Create ContentVariant A with retry logic
+    def create_variant_a():
+        with transaction.atomic():
+            return ContentVariant.objects.create(
+                post=post,
+                variant_id='A',
+                content=content_output.A,
+                platform='X',
+                metadata={'image_caption': content_output.A_image_caption}
+            )
+
+    variant_a = retry_on_db_lock(create_variant_a)
+
+    # Generate and save media for Variant A
+    try:
+        asset_a = media_agent.create_image(prompt=content_output.A_image_caption)
+        mime_type = asset_a['mime_type']
+        ext = mime_type.split('/')[-1]
+        data = ContentFile(base64.b64decode(asset_a['data']))
+
+        # Save asset with retry logic
+        def save_variant_a_asset():
+            variant_a.asset.save(f'variant_a_image_{post.post_id}.{ext}', data, save=True)
+
+        retry_on_db_lock(save_variant_a_asset)
+    except Exception as e:
+        print(f"Warning: Failed to generate image for variant A of post {post.post_id}: {e}")
+
+    # Create ContentVariant B with retry logic
+    def create_variant_b():
+        with transaction.atomic():
+            return ContentVariant.objects.create(
+                post=post,
+                variant_id='B',
+                content=content_output.B,
+                platform='X',
+                metadata={'image_caption': content_output.B_image_caption}
+            )
+
+    variant_b = retry_on_db_lock(create_variant_b)
+
+    # Generate and save media for Variant B
+    try:
+        asset_b = media_agent.create_image(prompt=content_output.B_image_caption)
+        mime_type = asset_b['mime_type']
+        ext = mime_type.split('/')[-1]
+        data = ContentFile(base64.b64decode(asset_b['data']))
+
+        # Save asset with retry logic
+        def save_variant_b_asset():
+            variant_b.asset.save(f'variant_b_image_{post.post_id}.{ext}', data, save=True)
+
+        retry_on_db_lock(save_variant_b_asset)
+    except Exception as e:
+        print(f"Warning: Failed to generate image for variant B of post {post.post_id}: {e}")
+
+    return variant_a, variant_b
+
+
+# =====================
 # Convenience Functions
 # =====================
 

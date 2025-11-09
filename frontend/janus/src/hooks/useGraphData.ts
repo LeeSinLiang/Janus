@@ -5,20 +5,25 @@ import { Node, Edge } from '@xyflow/react';
 import { fetchGraphData, fetchGraphDataMock, fetchGraphDataV1, fetchGraphDataV2, getXPostMetrics } from '@/services/api';
 import { parseGraphData } from '@/utils/graphParser';
 import { diffGraphData, applyGraphDiff } from '@/utils/graphDiff';
+import { PostMetrics } from '@/types/api';
+import { CampaignInfo } from '@/types/api';
 
 interface UseGraphDataOptions {
   pollingInterval?: number; // in milliseconds
   useMockData?: boolean; // for development/testing
+  campaignId?: string; // optional campaign ID to filter data
 }
 
 interface UseGraphDataReturn {
   nodes: Node[];
   edges: Edge[];
+  postMetrics: PostMetrics[];
   loading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
+  campaign: CampaignInfo | null;
 }
 
 /**
@@ -31,12 +36,14 @@ interface UseGraphDataReturn {
  * @returns Graph data, loading state, error state, and manual refetch function
  */
 export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataReturn {
-  const { pollingInterval = 5000, useMockData = false } = options;
+  const { pollingInterval = 5000, useMockData = false, campaignId } = options;
 
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [postMetrics, setPostMetrics] = useState<PostMetrics[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
+  const [campaign, setCampaign] = useState<CampaignInfo | null>(null);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef<boolean>(true);
@@ -50,7 +57,7 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
       // First, fetch current nodes to get their pks for metrics update
       if (!useMockData && !isInitialLoadRef.current) {
         // Only fetch metrics on subsequent polls (not initial load)
-        const currentData = await fetchGraphDataV1();
+        const currentData = await fetchGraphDataV1(campaignId);
 
         // Sequentially fetch metrics for all nodes
         for (const node of currentData.diagram) {
@@ -66,7 +73,26 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
       // Use mock or real API based on configuration
       const data = useMockData
         ? await fetchGraphDataMock()
-        : await fetchGraphDataV1();
+        : await fetchGraphDataV1(campaignId);
+
+      // Update campaign info if available
+      console.log('[useGraphData] Received data.campaign:', data.campaign);
+      if (data.campaign && isMountedRef.current) {
+        console.log('[useGraphData] Setting campaign state:', data.campaign);
+        setCampaign(data.campaign);
+      } else {
+        console.log('[useGraphData] Campaign data missing or component unmounted');
+      }
+
+      // Update post metrics if available
+      if (data.post_metrics && isMountedRef.current) {
+        setPostMetrics(data.post_metrics);
+      }
+
+      // Update post metrics if available
+      if (data.post_metrics && isMountedRef.current) {
+        setPostMetrics(data.post_metrics);
+      }
 
       // Always load data on initial fetch, then check changes flag for subsequent polls
       const shouldProcess = isInitialLoadRef.current || data.changes;
@@ -150,7 +176,7 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
         setLoading(false);
       }
     }
-  }, [useMockData]);
+  }, [useMockData, campaignId]);
 
   /**
    * Manual refetch function
@@ -186,10 +212,12 @@ export function useGraphData(options: UseGraphDataOptions = {}): UseGraphDataRet
   return {
     nodes,
     edges,
+    postMetrics,
     loading,
     error,
     refetch,
     setNodes,
     setEdges,
+    campaign,
   };
 }

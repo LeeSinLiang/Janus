@@ -1,16 +1,39 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Variant } from '@/types/api';
+import { API_BASE_URL } from '@/services/api';
 
-interface Variant {
-  variant_id: string;
-  content: string;
-  platform: string;
-  metadata: {
-    hook?: string;
-    reasoning?: string;
-    hashtags?: string[];
-  };
+// Helper function to determine media type based on file extension
+function getMediaType(assetUrl: string): 'image' | 'video' | null {
+  if (!assetUrl) return null;
+
+  const extension = assetUrl.split('.').pop()?.toLowerCase();
+
+  const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+  const videoExtensions = ['mp4', 'webm', 'ogg', 'mov'];
+
+  if (imageExtensions.includes(extension || '')) return 'image';
+  if (videoExtensions.includes(extension || '')) return 'video';
+
+  return null;
+}
+
+// Helper function to get full asset URL
+function getFullAssetUrl(assetPath: string): string {
+  if (!assetPath) return '';
+
+  // If the path already starts with http:// or https://, return as-is
+  if (assetPath.startsWith('http://') || assetPath.startsWith('https://')) {
+    return assetPath;
+  }
+
+  // Otherwise, prepend the backend URL
+  // Remove trailing slash from API_BASE_URL and leading slash from assetPath if present
+  const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  const path = assetPath.startsWith('/') ? assetPath : `/${assetPath}`;
+
+  return `${baseUrl}${path}`;
 }
 
 interface NodeVariantModalProps {
@@ -92,7 +115,7 @@ export default function NodeVariantModal({
 
         {/* Modal title */}
         <h2 className="mb-8 text-center text-2xl font-semibold text-zinc-900">
-          Choose a better one
+          A/B Test Different Styles 
         </h2>
 
         {/* Two variants side by side */}
@@ -113,6 +136,35 @@ export default function NodeVariantModal({
                 </div>
               )}
             </div>
+
+            {/* Media Asset Display */}
+            {variant1.asset && (() => {
+              const mediaType = getMediaType(variant1.asset);
+              const fullAssetUrl = getFullAssetUrl(variant1.asset);
+              return mediaType ? (
+                <div className="mb-4">
+                  <p className="text-xs font-medium text-zinc-500 uppercase mb-2">Media</p>
+                  {mediaType === 'image' ? (
+                    <img
+                      src={fullAssetUrl}
+                      alt={`Variant ${variant1.variant_id} media`}
+                      className="w-full rounded-lg border border-zinc-200 object-cover"
+                      style={{ maxHeight: '300px' }}
+                    />
+                  ) : (
+                    <video
+                      src={fullAssetUrl}
+                      controls
+                      className="w-full rounded-lg border border-zinc-200"
+                      style={{ maxHeight: '300px' }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
+                </div>
+              ) : null;
+            })()}
+
             <div className="mb-3">
               <p className="text-xs font-medium text-zinc-500 uppercase mb-1">Content</p>
               <p className="text-sm leading-relaxed text-zinc-700 whitespace-pre-wrap">
@@ -155,6 +207,35 @@ export default function NodeVariantModal({
                 </div>
               )}
             </div>
+
+            {/* Media Asset Display */}
+            {variant2.asset && (() => {
+              const mediaType = getMediaType(variant2.asset);
+              const fullAssetUrl = getFullAssetUrl(variant2.asset);
+              return mediaType ? (
+                <div className="mb-4">
+                  <p className="text-xs font-medium text-zinc-500 uppercase mb-2">Media</p>
+                  {mediaType === 'image' ? (
+                    <img
+                      src={fullAssetUrl}
+                      alt={`Variant ${variant2.variant_id} media`}
+                      className="w-full rounded-lg border border-zinc-200 object-cover"
+                      style={{ maxHeight: '300px' }}
+                    />
+                  ) : (
+                    <video
+                      src={fullAssetUrl}
+                      controls
+                      className="w-full rounded-lg border border-zinc-200"
+                      style={{ maxHeight: '300px' }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
+                </div>
+              ) : null;
+            })()}
+
             <div className="mb-3">
               <p className="text-xs font-medium text-zinc-500 uppercase mb-1">Content</p>
               <p className="text-sm leading-relaxed text-zinc-700 whitespace-pre-wrap">

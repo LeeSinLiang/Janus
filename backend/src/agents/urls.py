@@ -6,7 +6,8 @@ from django.urls import path
 from .views import (
     StrategyPlanningAPIView,
     CampaignListAPIView,
-    CampaignDetailAPIView
+    CampaignDetailAPIView,
+    GenerateNewPostAPIView
 )
 
 app_name = 'agents'
@@ -18,4 +19,7 @@ urlpatterns = [
     # Campaign APIs
     path('campaigns/', CampaignListAPIView.as_view(), name='campaign-list'),
     path('campaigns/<str:campaign_id>/', CampaignDetailAPIView.as_view(), name='campaign-detail'),
+
+    # New Post Generation API
+    path('generate-new-post/', GenerateNewPostAPIView.as_view(), name='generate-new-post'),
 ]

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -24,9 +24,12 @@ import NodeVariantModal from './NodeVariantModal';
 import WelcomeBar from './WelcomeBar';
 import EngagementLineChart from './EngagementLineChart';
 import EngagementPieChart from './EngagementPieChart';
+import CampaignStatusBar from './CampaignStatusBar';
+import PostMetricsBox from './PostMetricsBox';
 import { useGraphData } from '@/hooks/useGraphData';
-import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost } from '@/services/api';
+import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost, approveAllNodes, checkTrigger } from '@/services/api';
 import { Node as FlowNode } from '@xyflow/react';
+import { THEME_COLORS } from '@/styles/theme';
 
 const nodeTypes = {
   taskCard: TaskCardNode,
@@ -52,11 +55,17 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
   const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
   const [variants, setVariants] = useState<any>(null);
 
+  // Multi-node selection state
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+
   // Phase state
   const [activePhase, setActivePhase] = useState(1); // 0-indexed, so 1 = Phase 2
 
   // Success message state
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Approve all loading state
+  const [isApprovingAll, setIsApprovingAll] = useState(false);
 
   // Phase data
   const phases = [
@@ -67,10 +76,31 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
 
   // Fetch graph data with automatic polling and diff-based updates
   // The hook now handles all diffing internally and preserves positions
-  const { nodes, edges, loading, error, setNodes, setEdges } = useGraphData({
+  const { nodes, edges, postMetrics, loading, error, setNodes, setEdges, campaign } = useGraphData({
     pollingInterval: 5000,
     useMockData: false, // Set to false when connecting to real backend
   });
+
+  // Check triggers every 20 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkTrigger();
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Handle Escape key to clear node selections
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && selectedNodeIds.size > 0) {
+        setSelectedNodeIds(new Set());
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNodeIds]);
 
   // Approve a pending node
   const handleApproveNode = useCallback(
@@ -162,15 +192,70 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
     setRejectionState(null);
   }, []);
 
-  // Handle node click to fetch and show variants
-  const handleNodeClick = useCallback(async (node: FlowNode) => {
+  // Handle multi-node submission
+  const handleMultiNodeSubmit = useCallback(() => {
+    // Clear selections after submission
+    setSelectedNodeIds(new Set());
+  }, []);
+
+  // Handle approve all drafts in campaign
+  const handleApproveAll = useCallback(async () => {
+    if (!campaignId) {
+      console.error('No campaign ID provided');
+      return;
+    }
+
+    setIsApprovingAll(true);
+    try {
+      const result = await approveAllNodes(campaignId);
+
+      // Show success message with count
+      setSuccessMessage(`Successfully approved and published ${result.approved_count} draft post(s)!`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+
+      // Data will automatically refresh via polling
+    } catch (error) {
+      console.error('Failed to approve all nodes:', error);
+      setSuccessMessage('Failed to approve all drafts');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } finally {
+      setIsApprovingAll(false);
+    }
+  }, [campaignId]);
+
+  // Handle node click to fetch and show variants OR toggle selection with shift+click
+  const handleNodeClick = useCallback(async (node: FlowNode, event?: MouseEvent) => {
+    console.log('Node clicked:', node.id, node);
+
+    // Handle shift+click for multi-node selection
+    if (event?.shiftKey) {
+      setSelectedNodeIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(node.id)) {
+          // Deselect if already selected
+          newSet.delete(node.id);
+        } else {
+          // Select if not selected
+          newSet.add(node.id);
+        }
+        return newSet;
+      });
+      return; // Don't open variants modal on shift+click
+    }
+
+    // Normal click - fetch and show variants
     try {
       // Fetch variants from backend
+      console.log('Fetching variants for node:', node.id);
       const data = await fetchVariants(node.id);
+      console.log('Variants data received:', data);
 
       if (data.variants && data.variants.length >= 2) {
+        console.log('Setting variants and opening modal');
         setVariants(data.variants);
         setSelectedNode(node);
+      } else {
+        console.log('Not enough variants:', data.variants?.length || 0);
       }
     } catch (error) {
       console.error('Failed to fetch variants:', error);
@@ -229,6 +314,9 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
     setVariants(null);
   }, [selectedNode, variants, setNodes]);
 
+  // Count draft posts (nodes with pendingApproval)
+  const draftCount = nodes.filter(node => node.data?.pendingApproval === true).length;
+
   // Add handlers to node data
   const nodesWithHandlers = nodes.map((node) => ({
     ...node,
@@ -236,7 +324,8 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
       ...node.data,
       onApprove: () => handleApproveNode(node.id),
       onReject: () => handleRejectNode(node.id),
-      onClick: () => handleNodeClick(node),
+      onClick: (event?: MouseEvent) => handleNodeClick(node, event),
+      isSelected: selectedNodeIds.has(node.id),
     },
   }));
 
@@ -322,10 +411,65 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
         <ViewToggle activeView={activeView} onViewChange={setActiveView} />
       </div>
 
+      {/* Campaign Status Bar - positioned at top center above PhaseBar */}
+      {activeView === 'node-editor' && campaign && (
+        <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2">
+          <CampaignStatusBar campaign={campaign} />
+        </div>
+      )}
+
       {/* Phase Bar - positioned at top center (only in node-editor view) */}
       {activeView === 'node-editor' && (
-        <div className="absolute left-1/2 top-8 z-10 -translate-x-1/2">
+        <div className="absolute left-1/2 top-20 z-10 -translate-x-1/2">
           <PhaseBar phases={phases} onPhaseClick={setActivePhase} />
+        </div>
+      )}
+
+      {/* Approve All Button - positioned at top right (only when there are drafts) */}
+      {activeView === 'node-editor' && campaignId && draftCount > 0 && (
+        <div className="absolute right-8 top-8 z-10">
+          <button
+            onClick={handleApproveAll}
+            disabled={isApprovingAll}
+            style={{
+              background: THEME_COLORS.approveButton.background,
+              border: `1px solid ${THEME_COLORS.approveButton.border}`,
+            }}
+            className={`
+              px-6 py-3 rounded-xl font-medium text-black shadow-md
+              transition-all duration-200
+              ${isApprovingAll
+                ? 'opacity-60 cursor-not-allowed'
+                : 'hover:opacity-90 hover:scale-110 active:scale-95'
+              }
+            `}
+          >
+            {isApprovingAll ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Approving...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Approve All Drafts ({draftCount})
+              </span>
+            )}
+          </button>
         </div>
       )}
 
@@ -341,7 +485,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
             onConnect={onConnect}
             nodeTypes={nodeTypes}
             fitView
-            fitViewOptions={{ padding: {left: 0.3, top: 0.3, right: 0.3, bottom: 1.5} }}
+            fitViewOptions={{ padding: {left: 0.3, top: 0.7, right: 0.3, bottom: 1.1} }}
           >
             <Controls />
             <Background color="#e5e7eb" variant={BackgroundVariant.Dots} gap={16} size={4} />
@@ -355,6 +499,8 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
                 rejectionState={rejectionState}
                 onRejectionSubmit={handleRejectionSubmit}
                 onCancelRejection={handleCancelRejection}
+                selectedNodeIds={selectedNodeIds}
+                onMultiNodeSubmit={handleMultiNodeSubmit}
               />
             </div>
           </div>
@@ -362,7 +508,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
       ) : (
         /* Chart View */
         <div className="h-full w-full overflow-y-auto bg-gray-50 px-8 pt-24 pb-8">
-          <div className="mx-auto max-w-7xl space-y-6">
+          <div className="mx-auto space-y-6" style={{ maxWidth: '1800px' }}>
             {/* Welcome Bar */}
             <WelcomeBar />
 
@@ -374,6 +520,15 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
               {/* Pie Chart */}
               <EngagementPieChart />
             </div>
+
+            {/* Post Metrics Boxes - 4 columns single row */}
+            {postMetrics.length > 0 && (
+              <div className="grid grid-cols-4 gap-3 lg:grid-cols-4">
+                {postMetrics.map((post) => (
+                  <PostMetricsBox key={post.pk} post={post} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

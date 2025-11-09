@@ -81,6 +81,7 @@ class Post(models.Model):
 	selected_variant = models.CharField(max_length=10, blank=True, null=True)
 
 	metrics = models.ForeignKey(PostMetrics, on_delete=models.SET_NULL, null=True, blank=True)
+	trigger = models.CharField(max_length=255, blank=True, null=True)
 
 	# Many-to-many relationship to track post dependencies
 	next_posts = models.ManyToManyField(

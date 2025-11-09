@@ -53,7 +53,7 @@ class CloneTweet(models.Model):
         return self.retweets.count()
 
     def get_reply_count(self):
-        return CloneTweet.objects.filter(in_reply_to_tweet_id=self.tweet_id).count()
+        return self.comments.count()
 
     def get_impression_count(self):
         # For MVP, impressions = likes + retweets + replies + base views

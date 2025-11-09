@@ -448,7 +448,6 @@ def run_sequential_demo():
 		input("\n⏸️  Press Enter to continue to Scenario 2...")
 
 		# Scenario 2: Generate A/B Content
-		campaign = Campaign.objects.first()
 		scenario_2_generate_ab_content(campaign, product_description)
 
 		input("\n⏸️  Press Enter to continue to Scenario 3...")
