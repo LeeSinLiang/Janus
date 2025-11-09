@@ -1,9 +1,10 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import CanvasWithPolling from "@/components/CanvasWithPolling";
 
-export default function CanvasPage() {
+function CanvasContent() {
   const searchParams = useSearchParams();
   const campaignId = searchParams.get('campaign_id');
 
@@ -11,5 +12,13 @@ export default function CanvasPage() {
     <div className="h-screen w-screen">
       <CanvasWithPolling campaignId={campaignId || undefined} />
     </div>
+  );
+}
+
+export default function CanvasPage() {
+  return (
+    <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center">Loading...</div>}>
+      <CanvasContent />
+    </Suspense>
   );
 }
