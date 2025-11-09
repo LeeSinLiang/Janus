@@ -23,6 +23,7 @@ export interface TaskCardData {
   variant1?: Variant;
   variant2?: Variant;
   isSelected?: boolean;
+  assetsReady?: boolean; // True if both A and B variants have assets
 }
 
 interface TaskCardNodeProps {
@@ -33,9 +34,27 @@ interface TaskCardNodeProps {
 export default function TaskCardNode({ data, id }: TaskCardNodeProps) {
   const isPending = data.pendingApproval || false;
   const isSelected = data.isSelected || false;
+  const assetsReady = data.assetsReady;
 
   return (
     <div className="relative">
+      {/* Asset Loading Indicator - positioned at top-right corner */}
+      {/* Only show for pending approval (draft) nodes */}
+      {isPending && assetsReady !== undefined && (
+        <div
+          className="absolute -top-2 -right-2 z-20 flex items-center justify-center"
+          title={assetsReady ? "Assets ready - safe to approve" : "Assets loading - please wait..."}
+        >
+          <div
+            className={`h-7 w-7 rounded-full border-2 border-white shadow-md ${
+              assetsReady
+                ? 'bg-green-500'
+                : 'bg-yellow-500 animate-pulse'
+            }`}
+          />
+        </div>
+      )}
+
       {/* Approve/Reject buttons - positioned above the card */}
       {isPending && (
         <div className="absolute -top-16 right-2 z-10 flex gap-2">
@@ -43,11 +62,21 @@ export default function TaskCardNode({ data, id }: TaskCardNodeProps) {
           <button
             onClick={(e) => {
               e.stopPropagation();
+              // Warn if assets aren't ready yet
+              if (assetsReady === false) {
+                if (!confirm('Assets are still loading. Approving now will post without media. Continue?')) {
+                  return;
+                }
+              }
               data.onApprove?.();
             }}
             style={getButtonStyle('approve')}
-            className="flex h-12 w-12 items-center justify-center rounded-xl shadow-md transition-all hover:opacity-90 hover:scale-110"
-            title="Approve node"
+            className={`flex h-12 w-12 items-center justify-center rounded-xl shadow-md transition-all ${
+              assetsReady === false
+                ? 'opacity-60 cursor-wait'
+                : 'hover:opacity-90 hover:scale-110'
+            }`}
+            title={assetsReady === false ? "Assets loading - wait for green light" : "Approve node"}
           >
             <svg
               width="24"

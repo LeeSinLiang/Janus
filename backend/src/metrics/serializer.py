@@ -22,8 +22,8 @@ class PostSerializer(serializers.ModelSerializer):
     def get_assets_ready(self, obj):
         """Check if both variant A and B have assets (images) ready"""
         try:
-            variant_a = ContentVariant.objects.filter(post=obj, variant_id='A').first()
-            variant_b = ContentVariant.objects.filter(post=obj, variant_id='B').first()
+            variant_a = ContentVariant.objects.filter(post=obj, variant_id='A').order_by('-created_at').first()
+            variant_b = ContentVariant.objects.filter(post=obj, variant_id='B').order_by('-created_at').first()
 
             # Both variants must exist and have assets
             if variant_a and variant_b:

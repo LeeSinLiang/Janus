@@ -95,7 +95,7 @@ export function diffGraphData(
 }
 
 /**
- * Check if node data has changed (title, description, metrics, or tags)
+ * Check if node data has changed (title, description, metrics, tags, or assetsReady)
  */
 function hasNodeDataChanged(oldNode: Node, newNode: Node): boolean {
   const oldData = oldNode.data as any;
@@ -110,6 +110,7 @@ function hasNodeDataChanged(oldNode: Node, newNode: Node): boolean {
     oldData?.description !== newData?.description ||
     oldData?.likes !== newData?.likes ||
     oldData?.comments !== newData?.comments ||
+    oldData?.assetsReady !== newData?.assetsReady ||
     tagsChanged
   );
 }
