@@ -144,7 +144,7 @@ export default function TaskCardNode({ data, id }: TaskCardNodeProps) {
             <span className="text-zinc-700">{data.likes}</span>
           </span>
           <span className="flex items-center gap-1">
-            <span>💬</span>
+            <span>🔄️</span>
             <span className="text-zinc-700">{data.comments}</span>
           </span>
         </div>
