@@ -17,10 +17,18 @@ export interface NodeMetrics {
   retweets: number;
 }
 
+export interface CampaignInfo {
+  campaign_id: string;
+  name: string;
+  phase: 'planning' | 'content_creation' | 'scheduled' | 'active' | 'analyzing' | 'completed';
+  description: string;
+}
+
 export interface GraphResponse {
   diagram: DiagramNode[];
   metrics: Record<number, NodeMetrics>; // Object with pk as key
   changes: boolean;
+  campaign?: CampaignInfo | null;
 }
 
 export interface ApiError {

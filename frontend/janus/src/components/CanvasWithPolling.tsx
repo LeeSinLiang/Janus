@@ -24,6 +24,7 @@ import NodeVariantModal from './NodeVariantModal';
 import WelcomeBar from './WelcomeBar';
 import EngagementLineChart from './EngagementLineChart';
 import EngagementPieChart from './EngagementPieChart';
+import CampaignStatusBar from './CampaignStatusBar';
 import { useGraphData } from '@/hooks/useGraphData';
 import { approveNode, rejectNode, fetchVariants, selectVariant, createXPost, approveAllNodes } from '@/services/api';
 import { Node as FlowNode } from '@xyflow/react';
@@ -71,9 +72,10 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
 
   // Fetch graph data with automatic polling and diff-based updates
   // The hook now handles all diffing internally and preserves positions
-  const { nodes, edges, loading, error, setNodes, setEdges } = useGraphData({
+  const { nodes, edges, loading, error, setNodes, setEdges, campaign } = useGraphData({
     pollingInterval: 5000,
     useMockData: false, // Set to false when connecting to real backend
+    campaignId: campaignId, // Pass campaign ID from props
   });
 
   // Approve a pending node
@@ -360,9 +362,16 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
         <ViewToggle activeView={activeView} onViewChange={setActiveView} />
       </div>
 
+      {/* Campaign Status Bar - positioned at top center above PhaseBar */}
+      {activeView === 'node-editor' && campaign && (
+        <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2">
+          <CampaignStatusBar campaign={campaign} />
+        </div>
+      )}
+
       {/* Phase Bar - positioned at top center (only in node-editor view) */}
       {activeView === 'node-editor' && (
-        <div className="absolute left-1/2 top-8 z-10 -translate-x-1/2">
+        <div className="absolute left-1/2 top-20 z-10 -translate-x-1/2">
           <PhaseBar phases={phases} onPhaseClick={setActivePhase} />
         </div>
       )}

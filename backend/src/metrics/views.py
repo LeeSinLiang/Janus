@@ -30,13 +30,40 @@ def getMetricsDB():
 
 @api_view(['GET'])
 def nodesJSON(request):
-	posts = Post.objects.filter(campaign=Campaign.objects.first())
+	# Get campaign_id from query params, fallback to first campaign
+	campaign_id = request.GET.get('campaign_id')
+
+	if campaign_id:
+		try:
+			campaign = Campaign.objects.get(campaign_id=campaign_id)
+		except Campaign.DoesNotExist:
+			return Response({
+				"error": f"Campaign with id '{campaign_id}' not found"
+			}, status=404)
+	else:
+		campaign = Campaign.objects.first()
+
+	if not campaign:
+		return Response({
+			"error": "No campaigns found"
+		}, status=404)
+
+	posts = Post.objects.filter(campaign=campaign)
 	serializer = PostSerializer(posts, many=True)
 	metricsData = getMetricsDB()
 
+	# Include campaign status information
+	campaign_info = {
+		"campaign_id": campaign.campaign_id,
+		"name": campaign.name,
+		"phase": campaign.phase,
+		"description": campaign.description,
+	}
+
 	return Response({
 		"diagram": serializer.data,
-		"metrics": metricsData
+		"metrics": metricsData,
+		"campaign": campaign_info
 	}, status=200)
 
 @api_view(['POST'])
