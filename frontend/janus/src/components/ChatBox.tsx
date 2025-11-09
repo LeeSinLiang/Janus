@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Node } from '@xyflow/react';
-import { sendTrigger } from '@/services/api';
+import { sendTrigger, sendMultiNodePrompt } from '@/services/api';
 
 interface RejectionState {
   nodeId: string;
@@ -14,13 +14,17 @@ interface ChatBoxProps {
   rejectionState?: RejectionState | null;
   onRejectionSubmit?: (rejectMessage: string) => void;
   onCancelRejection?: () => void;
+  selectedNodeIds?: Set<string>;
+  onMultiNodeSubmit?: () => void;
 }
 
 export default function ChatBox({
   nodes,
   rejectionState,
   onRejectionSubmit,
-  onCancelRejection
+  onCancelRejection,
+  selectedNodeIds = new Set(),
+  onMultiNodeSubmit
 }: ChatBoxProps) {
   const [message, setMessage] = useState('');
   const [showMentionMenu, setShowMentionMenu] = useState(false);
@@ -146,6 +150,20 @@ export default function ChatBox({
       // In rejection mode - submit rejection
       onRejectionSubmit?.(message.trim());
       setMessage('');
+    } else if (selectedNodeIds.size > 0) {
+      // Multi-node selection mode - send to sintodo
+      const nodePks = Array.from(selectedNodeIds).map(id => parseInt(id));
+
+      try {
+        await sendMultiNodePrompt(nodePks, message.trim());
+        console.log(`Multi-node prompt sent for nodes: ${nodePks.join(', ')}`);
+
+        // Clear message and notify parent to clear selections
+        setMessage('');
+        onMultiNodeSubmit?.();
+      } catch (error) {
+        console.error('Failed to send multi-node prompt:', error);
+      }
     } else {
       // Normal message mode - parse for trigger
       // Extract node title from **Node Title** format
@@ -269,12 +287,14 @@ export default function ChatBox({
           <div className="mb-3">
             <span className="text-base font-semibold text-[#FCD34D]">Janus:</span>
             <span className="ml-2 text-sm text-zinc-700">
-              How can I help with your marketing roadmap?
+              {selectedNodeIds.size > 0
+                ? `${selectedNodeIds.size} node${selectedNodeIds.size > 1 ? 's' : ''} selected. What would you like to improve?`
+                : 'How can I help with your marketing roadmap?'}
             </span>
           </div>
         )}
 
-        {/* Context button */}
+        {/* Context buttons and Send button */}
         {!rejectionState && (
           <div className="mb-2 flex items-center justify-between">
             <div className="flex gap-2">
@@ -289,11 +309,11 @@ export default function ChatBox({
             <button
               onClick={handleSubmit}
               className={`rounded-lg p-1.5 text-white transition-colors ${
-                rejectionState
-                  ? 'bg-red-600 hover:bg-red-700'
+                selectedNodeIds.size > 0
+                  ? 'bg-purple-600 hover:bg-purple-700'
                   : 'bg-zinc-900 hover:bg-zinc-700'
               }`}
-              title={rejectionState ? 'Submit rejection' : 'Send message'}
+              title={selectedNodeIds.size > 0 ? 'Send suggestion' : 'Send message'}
             >
               <svg
                 width="18"
@@ -319,10 +339,18 @@ export default function ChatBox({
             value={message}
             onChange={handleMessageChange}
             onKeyDown={handleKeyDown}
-            placeholder={rejectionState ? "Explain why you're rejecting this node..." : "Change triggers for marketing strategy..."}
+            placeholder={
+              rejectionState
+                ? "Explain why you're rejecting this node..."
+                : selectedNodeIds.size > 0
+                ? "Enter your suggestion for the selected nodes..."
+                : "Change triggers for marketing strategy..."
+            }
             className={`w-full resize-none rounded-lg border px-3 py-2 pr-32 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-1 ${
               rejectionState
                 ? 'border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-400'
+                : selectedNodeIds.size > 0
+                ? 'border-purple-300 bg-purple-50 focus:border-purple-400 focus:ring-purple-400'
                 : 'border-zinc-200 bg-white focus:border-zinc-300 focus:ring-zinc-300'
             }`}
             rows={rejectionState ? 3 : 1}
