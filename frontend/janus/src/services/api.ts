@@ -8,9 +8,15 @@ const GRAPH_ENDPOINT = '/api/graph';
  * Fetch graph data from the backend (Version 1)
  * Expects { diagram: Post[], metrics: Record<string, NodeMetrics> } from /nodesJson/
  */
-export async function fetchGraphDataV1(): Promise<GraphResponse> {
+export async function fetchGraphDataV1(campaignId?: string): Promise<GraphResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/nodesJson/`, {
+    // Build URL with optional campaign_id query param
+    const url = new URL(`${API_BASE_URL}/nodesJson/`);
+    if (campaignId) {
+      url.searchParams.append('campaign_id', campaignId);
+    }
+
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -41,6 +47,7 @@ export async function fetchGraphDataV1(): Promise<GraphResponse> {
       diagram: data.diagram || [],
       metrics: metricsWithNumberKeys,
       post_metrics: data.post_metrics || [],
+      campaign: data.campaign || null,
       changes: true, // Always process on fetch
     };
   } catch (error) {
@@ -129,6 +136,31 @@ export async function approveNode(nodePk: string): Promise<void> {
     }
   } catch (error) {
     console.error('Error approving node:', error);
+    throw error;
+  }
+}
+
+/**
+ * Approve all draft nodes in a campaign - sends POST request with campaign_id
+ */
+export async function approveAllNodes(campaignId: string): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/approveAll`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ campaign_id: campaignId }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to approve all nodes: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error approving all nodes:', error);
     throw error;
   }
 }
@@ -398,6 +430,12 @@ export async function fetchGraphDataMock(): Promise<GraphResponse> {
         comments: 22400,
       },
     ],
+    campaign: {
+      campaign_id: 'mock_campaign_1',
+      name: 'Mock Campaign',
+      phase: 'planning',
+      description: 'Mock campaign for testing',
+    },
     changes: false,
   };
 }
