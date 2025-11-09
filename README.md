@@ -35,12 +35,14 @@ Actively evolving during and after the hackathon, aiming to launch as a startup.
 
 **⚡ Quickstart**<br>
 _**Monorepo layout**_<br>
-.<br>
-├── backend/<br>
-│   ├── requirements.txt<br>
-│   └── src/  # manage.py lives here<br>
-└── frontend/<br>
-    └── janus/  # Next.js app<br><br>
+```
+.
+├── backend/
+│   ├── requirements.txt
+│   └── src/  # manage.py lives here
+└── frontend/
+    └── janus/  # Next.js app
+```
 
 _**1) Clone**_<br>
 git clone https://github.com/LeeSinLiang/Janus.git<br>
