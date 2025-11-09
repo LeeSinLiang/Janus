@@ -356,6 +356,28 @@ export async function checkTrigger(): Promise<void> {
 }
 
 /**
+ * Send multi-node prompt - sends POST request with selected node pks and user prompt
+ */
+export async function sendMultiNodePrompt(nodes: number[], prompt: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/sintodo`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ nodes, prompt }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to send multi-node prompt: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error sending multi-node prompt:', error);
+    throw error;
+  }
+}
+
+/**
  * Mock function for development/testing
  * Remove this when connecting to real backend
  */

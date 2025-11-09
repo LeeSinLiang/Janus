@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Node } from '@xyflow/react';
-import { sendTrigger } from '@/services/api';
+import { sendTrigger, sendMultiNodePrompt } from '@/services/api';
 
 interface RejectionState {
   nodeId: string;
@@ -14,13 +14,17 @@ interface ChatBoxProps {
   rejectionState?: RejectionState | null;
   onRejectionSubmit?: (rejectMessage: string) => void;
   onCancelRejection?: () => void;
+  selectedNodeIds?: Set<string>;
+  onMultiNodeSubmit?: () => void;
 }
 
 export default function ChatBox({
   nodes,
   rejectionState,
   onRejectionSubmit,
-  onCancelRejection
+  onCancelRejection,
+  selectedNodeIds = new Set(),
+  onMultiNodeSubmit
 }: ChatBoxProps) {
   const [message, setMessage] = useState('');
   const [showMentionMenu, setShowMentionMenu] = useState(false);
@@ -146,6 +150,20 @@ export default function ChatBox({
       // In rejection mode - submit rejection
       onRejectionSubmit?.(message.trim());
       setMessage('');
+    } else if (selectedNodeIds.size > 0) {
+      // Multi-node selection mode - send to sintodo
+      const nodePks = Array.from(selectedNodeIds).map(id => parseInt(id));
+
+      try {
+        await sendMultiNodePrompt(nodePks, message.trim());
+        console.log(`Multi-node prompt sent for nodes: ${nodePks.join(', ')}`);
+
+        // Clear message and notify parent to clear selections
+        setMessage('');
+        onMultiNodeSubmit?.();
+      } catch (error) {
+        console.error('Failed to send multi-node prompt:', error);
+      }
     } else {
       // Normal message mode - parse for trigger
       // Extract node title from **Node Title** format
@@ -269,19 +287,47 @@ export default function ChatBox({
           <div className="mb-3">
             <span className="text-base font-semibold text-[#FCD34D]">Janus:</span>
             <span className="ml-2 text-sm text-zinc-700">
-              How can I help with your marketing roadmap?
+              {selectedNodeIds.size > 0
+                ? `${selectedNodeIds.size} node${selectedNodeIds.size > 1 ? 's' : ''} selected. What would you like to improve?`
+                : 'How can I help with your marketing roadmap?'}
             </span>
           </div>
         )}
 
-        {/* Context button */}
+        {/* Context buttons and Send button */}
         {!rejectionState && (
-          <div className="mb-2 flex gap-2">
-            <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
-              @ to add context
-            </button>
-            <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
-              / for commands
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex gap-2">
+              <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
+                @ to add context
+              </button>
+              <button className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100">
+                / for commands
+              </button>
+            </div>
+            {/* Send button */}
+            <button
+              onClick={handleSubmit}
+              className={`rounded-lg p-1.5 text-white transition-colors ${
+                selectedNodeIds.size > 0
+                  ? 'bg-purple-600 hover:bg-purple-700'
+                  : 'bg-zinc-900 hover:bg-zinc-700'
+              }`}
+              title={selectedNodeIds.size > 0 ? 'Send suggestion' : 'Send message'}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
             </button>
           </div>
         )}
@@ -293,10 +339,18 @@ export default function ChatBox({
             value={message}
             onChange={handleMessageChange}
             onKeyDown={handleKeyDown}
-            placeholder={rejectionState ? "Explain why you're rejecting this node..." : "Change triggers for marketing strategy..."}
+            placeholder={
+              rejectionState
+                ? "Explain why you're rejecting this node..."
+                : selectedNodeIds.size > 0
+                ? "Enter your suggestion for the selected nodes..."
+                : "Change triggers for marketing strategy..."
+            }
             className={`w-full resize-none rounded-lg border px-3 py-2 pr-32 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-1 ${
               rejectionState
                 ? 'border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-400'
+                : selectedNodeIds.size > 0
+                ? 'border-purple-300 bg-purple-50 focus:border-purple-400 focus:ring-purple-400'
                 : 'border-zinc-200 bg-white focus:border-zinc-300 focus:ring-zinc-300'
             }`}
             rows={rejectionState ? 3 : 1}
@@ -344,69 +398,7 @@ export default function ChatBox({
             </div>
           )}
 
-          {/* Bottom toolbar */}
-          <div className="mt-2 flex items-center justify-end">
-            <div className="flex items-right gap-2">
-              {/* Image icon */}
-              <button className="text-zinc-400 transition-colors hover:text-zinc-600">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-              </button>
-
-              {/* Video play icon */}
-              <button className="text-zinc-400 transition-colors hover:text-zinc-600">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-              </button>
-
-              {/* Send button */}
-              <button
-                onClick={handleSubmit}
-                className={`rounded-lg p-1.5 text-white transition-colors ${
-                  rejectionState
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-zinc-900 hover:bg-zinc-700'
-                }`}
-                title={rejectionState ? 'Submit rejection' : 'Send message'}
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          
         </div>
       </div>
     </div>

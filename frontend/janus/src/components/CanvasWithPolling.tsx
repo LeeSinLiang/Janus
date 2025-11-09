@@ -55,6 +55,9 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
   const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
   const [variants, setVariants] = useState<any>(null);
 
+  // Multi-node selection state
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+
   // Phase state
   const [activePhase, setActivePhase] = useState(1); // 0-indexed, so 1 = Phase 2
 
@@ -86,6 +89,18 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
 
     return () => clearInterval(interval);
   }, []);
+
+  // Handle Escape key to clear node selections
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && selectedNodeIds.size > 0) {
+        setSelectedNodeIds(new Set());
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNodeIds]);
 
   // Approve a pending node
   const handleApproveNode = useCallback(
@@ -177,6 +192,12 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
     setRejectionState(null);
   }, []);
 
+  // Handle multi-node submission
+  const handleMultiNodeSubmit = useCallback(() => {
+    // Clear selections after submission
+    setSelectedNodeIds(new Set());
+  }, []);
+
   // Handle approve all drafts in campaign
   const handleApproveAll = useCallback(async () => {
     if (!campaignId) {
@@ -202,9 +223,27 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
     }
   }, [campaignId]);
 
-  // Handle node click to fetch and show variants
-  const handleNodeClick = useCallback(async (node: FlowNode) => {
+  // Handle node click to fetch and show variants OR toggle selection with shift+click
+  const handleNodeClick = useCallback(async (node: FlowNode, event?: MouseEvent) => {
     console.log('Node clicked:', node.id, node);
+
+    // Handle shift+click for multi-node selection
+    if (event?.shiftKey) {
+      setSelectedNodeIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(node.id)) {
+          // Deselect if already selected
+          newSet.delete(node.id);
+        } else {
+          // Select if not selected
+          newSet.add(node.id);
+        }
+        return newSet;
+      });
+      return; // Don't open variants modal on shift+click
+    }
+
+    // Normal click - fetch and show variants
     try {
       // Fetch variants from backend
       console.log('Fetching variants for node:', node.id);
@@ -285,7 +324,8 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
       ...node.data,
       onApprove: () => handleApproveNode(node.id),
       onReject: () => handleRejectNode(node.id),
-      onClick: () => handleNodeClick(node),
+      onClick: (event?: MouseEvent) => handleNodeClick(node, event),
+      isSelected: selectedNodeIds.has(node.id),
     },
   }));
 
@@ -459,6 +499,8 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
                 rejectionState={rejectionState}
                 onRejectionSubmit={handleRejectionSubmit}
                 onCancelRejection={handleCancelRejection}
+                selectedNodeIds={selectedNodeIds}
+                onMultiNodeSubmit={handleMultiNodeSubmit}
               />
             </div>
           </div>
