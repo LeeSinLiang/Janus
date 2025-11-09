@@ -12,6 +12,7 @@ from agents.models import Post, ContentVariant, Campaign
 from requests_oauthlib import OAuth1
 from time import time
 from django.core.cache import cache
+from agents import create_trigger_parser
 
 
 
@@ -41,11 +42,64 @@ def setTrigger(request):
 		post = Post.objects.get(pk=pk)
 	except Post.DoesNotExist:
 		return Response({"error": f"Post {pk} not found"}, status=status.HTTP_404_NOT_FOUND)
-	
-	post.trigger = trigger
-	post.save()
 
-	return Response({"success": True, "post_id": post.pk, "trigger": post.trigger}, status=status.HTTP_200_OK)
+	# This endpoint is deprecated - use parseTrigger instead
+	# Kept for backward compatibility
+	return Response({"error": "This endpoint is deprecated. Use /api/parse-trigger/ instead."}, status=400)
+
+@api_view(['POST'])
+def parseTrigger(request):
+	"""Parse natural language trigger prompt and save to post"""
+	pk = request.data.get("pk")
+	condition = request.data.get("condition")
+	prompt = request.data.get("prompt")
+
+	if not pk:
+		return Response({"error": "Missing 'pk' field"}, status=400)
+	if not condition:
+		return Response({"error": "Missing 'condition' field"}, status=400)
+	if not prompt:
+		return Response({"error": "Missing 'prompt' field"}, status=400)
+
+	# Validate condition is in allowed choices
+	valid_conditions = ['likes', 'retweets', 'impressions', 'comments']
+	if condition not in valid_conditions:
+		return Response({
+			"error": f"Invalid condition '{condition}'. Must be one of: {', '.join(valid_conditions)}"
+		}, status=400)
+
+	try:
+		post = Post.objects.get(pk=pk)
+	except Post.DoesNotExist:
+		return Response({"error": f"Post {pk} not found"}, status=status.HTTP_404_NOT_FOUND)
+
+	try:
+		# Create trigger parser agent and parse the prompt
+		parser = create_trigger_parser()
+		trigger_config = parser.parse(condition, prompt)
+
+		# Save parsed trigger to post
+		post.trigger_condition = condition
+		post.trigger_value = trigger_config.value
+		post.trigger_comparison = trigger_config.comparison
+		post.trigger_prompt = trigger_config.prompt
+		post.save()
+
+		return Response({
+			"success": True,
+			"post_id": post.pk,
+			"trigger": {
+				"condition": condition,
+				"value": trigger_config.value,
+				"comparison": trigger_config.comparison,
+				"prompt": trigger_config.prompt
+			}
+		}, status=status.HTTP_200_OK)
+
+	except Exception as e:
+		return Response({
+			"error": f"Failed to parse trigger: {str(e)}"
+		}, status=500)
 
 ###### FOR AI AGENT TO DETERMINE NEW DIRECTION/STRATEGY ######
 def getMetricsAI(pk):
@@ -62,21 +116,65 @@ def getMetricsAI(pk):
 
 @api_view(['GET'])
 def checkTrigger(request):
-	publishedPosts = Post.objects.filter(status="published").select_related('metrics').order_by('created_at')
-	triggeredPosts = []
-	for post in publishedPosts:
-		if (post.trigger == "like"):
-			if (post.metrics.likes < 1):
-				triggeredPosts.append(post.pk)
-		elif (post.trigger == "retweet"):
-			if (post.metrics.retweets < 1):
-				triggeredPosts.append(post.pk)
-	
-	if (triggeredPosts):
-		print("Triggered posts:", triggeredPosts)
-		# callSinAgentAPI(triggeredPosts)
+	"""Check if any published posts meet their trigger conditions"""
+	from django.utils import timezone
 
-	return Response({"triggered_posts": triggeredPosts}, status=200)
+	# Filter published posts that have triggers configured
+	publishedPosts = Post.objects.filter(
+		status="published",
+		trigger_condition__isnull=False,
+		trigger_value__isnull=False,
+		trigger_comparison__isnull=False
+	).select_related('metrics').order_by('created_at')
+
+	triggeredPosts = []
+
+	for post in publishedPosts:
+		# Skip if post hasn't been posted yet or metrics don't exist
+		if not post.posted_time or not post.metrics:
+			continue
+
+		# Calculate elapsed time since posting
+		elapsed_time = (timezone.now() - post.posted_time).total_seconds()
+
+		# Get the metric value based on trigger_condition
+		metric_value = 0
+		if post.trigger_condition == 'likes':
+			metric_value = post.metrics.likes
+		elif post.trigger_condition == 'retweets':
+			metric_value = post.metrics.retweets
+		elif post.trigger_condition == 'impressions':
+			metric_value = post.metrics.impressions
+		elif post.trigger_condition == 'comments':
+			metric_value = post.metrics.comments
+
+		# Evaluate the comparison
+		is_triggered = False
+		if post.trigger_comparison == '<':
+			is_triggered = metric_value < post.trigger_value
+		elif post.trigger_comparison == '=':
+			is_triggered = metric_value == post.trigger_value
+		elif post.trigger_comparison == '>':
+			is_triggered = metric_value > post.trigger_value
+
+		if is_triggered:
+			triggeredPosts.append({
+				"post_pk": post.pk,
+				"post_title": post.title,
+				"trigger_condition": post.trigger_condition,
+				"trigger_value": post.trigger_value,
+				"trigger_comparison": post.trigger_comparison,
+				"current_value": metric_value,
+				"elapsed_time_seconds": elapsed_time,
+				"trigger_prompt": post.trigger_prompt
+			})
+
+	if triggeredPosts:
+		print(f"Triggered {len(triggeredPosts)} post(s):", triggeredPosts)
+		# TODO: call AI Agent here to generate new posts/strategy based on performance
+		# For each triggered post, use trigger_prompt to guide the agent
+
+	return Response({"triggered_posts": triggeredPosts, "count": len(triggeredPosts)}, status=200)
 
 @api_view(['GET'])
 def nodesJSON(request):
@@ -170,6 +268,9 @@ def createXPost(request):
 				postMetrics.tweet_id = tweet_id
 				postMetrics.save()
 			post.status = "published"
+			# Set posted_time for trigger evaluation
+			from django.utils import timezone
+			post.posted_time = timezone.now()
 			post.save()
 
 	return Response(resp.json(), status=resp.status_code)
@@ -379,8 +480,10 @@ def approveAllNodes(request):
 							post_metrics.tweet_id = tweet_id
 							post_metrics.save()
 
-					# Update post status to published
+					# Update post status to published and set posted_time
+					from django.utils import timezone
 					post.status = 'published'
+					post.posted_time = timezone.now()
 					post.save()
 					approved_count += 1
 				else:

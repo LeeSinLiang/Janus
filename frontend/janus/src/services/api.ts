@@ -318,6 +318,7 @@ export async function selectVariant(pk: string, variantId: string): Promise<void
 
 /**
  * Send trigger for a node - sends POST request with node pk and trigger type
+ * @deprecated Use parseTrigger instead
  */
 export async function sendTrigger(pk: number, trigger: 'like' | 'retweet'): Promise<void> {
   try {
@@ -334,6 +335,37 @@ export async function sendTrigger(pk: number, trigger: 'like' | 'retweet'): Prom
     }
   } catch (error) {
     console.error('Error sending trigger:', error);
+    throw error;
+  }
+}
+
+/**
+ * Parse natural language trigger prompt and save to post
+ * New robust trigger mechanism using TriggerParserAgent
+ */
+export async function parseTrigger(
+  pk: number,
+  condition: 'likes' | 'retweets' | 'impressions' | 'comments',
+  prompt: string
+): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/parseTrigger/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pk, condition, prompt }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to parse trigger: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error parsing trigger:', error);
     throw error;
   }
 }

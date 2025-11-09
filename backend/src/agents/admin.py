@@ -58,10 +58,15 @@ class PostAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Post Information', {
-            'fields': ('title', 'description', 'next_posts', 'post_id', 'campaign', 'phase', 'status', 'selected_variant', 'trigger')
+            'fields': ('title', 'description', 'next_posts', 'post_id', 'campaign', 'phase', 'status', 'selected_variant')
         }),
-        ('Metrics', {
-            'fields': ('metrics',),
+        ('Trigger Configuration', {
+            'fields': ('trigger_condition', 'trigger_value', 'trigger_comparison', 'trigger_prompt'),
+            'classes': ('collapse',),
+            'description': 'Configure trigger conditions for automated response'
+        }),
+        ('Metrics & Publishing', {
+            'fields': ('metrics', 'posted_time'),
             'classes': ('collapse',)
         }),
         ('Timestamps', {
