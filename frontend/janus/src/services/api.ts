@@ -1,7 +1,7 @@
-import { DiagramNode, GraphResponse, ApiError } from '@/types/api';
+import { DiagramNode, GraphResponse, ApiError, CampaignsResponse } from '@/types/api';
 
 // Configure your API endpoint here
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const GRAPH_ENDPOINT = '/api/graph';
 
 /**
@@ -334,6 +334,30 @@ export async function sendTrigger(pk: number, trigger: 'like' | 'retweet'): Prom
     }
   } catch (error) {
     console.error('Error sending trigger:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch list of all campaigns
+ */
+export async function fetchCampaigns(): Promise<CampaignsResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/agents/campaigns/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch campaigns: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching campaigns:', error);
     throw error;
   }
 }

@@ -47,3 +47,31 @@ export interface ApiError {
   code?: string;
   status?: number;
 }
+
+export interface Variant {
+  variant_id: string;
+  content: string;
+  platform: string;
+  asset?: string;
+  metadata: {
+    hook?: string;
+    reasoning?: string;
+    hashtags?: string[];
+  };
+}
+
+export interface Campaign {
+  id: number;
+  campaign_id: string;
+  name: string;
+  description: string;
+  phase: 'planning' | 'content_creation' | 'scheduled' | 'active' | 'analyzing' | 'completed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CampaignsResponse {
+  success: boolean;
+  count: number;
+  campaigns: Campaign[];
+}
