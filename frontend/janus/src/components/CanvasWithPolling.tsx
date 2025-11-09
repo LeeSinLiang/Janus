@@ -80,16 +80,17 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
   const { nodes, edges, postMetrics, loading, error, setNodes, setEdges, campaign } = useGraphData({
     pollingInterval: 5000,
     useMockData: false, // Set to false when connecting to real backend
+    campaignId: campaignId, // Filter by campaign_id from URL
   });
 
   // Check triggers every 20 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      checkTrigger();
+      checkTrigger(campaignId || undefined);
     }, 20000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [campaignId]);
 
   // Handle Escape key to clear node selections
   useEffect(() => {
@@ -417,6 +418,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
             setVariants(null);
             setVariantMetrics(null);
           }}
+          variants={variants}
           variant1={variants[0]}
           variant2={variants[1]}
           onSelectVariant={handleSelectVariant}

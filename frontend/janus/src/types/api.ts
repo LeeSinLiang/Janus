@@ -53,10 +53,13 @@ export interface Variant {
   content: string;
   platform: string;
   asset?: string;
+  created_at?: string; // ISO timestamp for variant creation
   metadata: {
     hook?: string;
     reasoning?: string;
     hashtags?: string[];
+    regenerated?: boolean; // True if this variant was regenerated from trigger
+    image_caption?: string; // Caption for media asset
   };
 }
 

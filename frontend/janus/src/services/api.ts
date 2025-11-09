@@ -397,9 +397,14 @@ export async function fetchCampaigns(): Promise<CampaignsResponse> {
 /**
  * Check triggers - sends GET request to check if any triggers should fire
  */
-export async function checkTrigger(): Promise<void> {
+export async function checkTrigger(campaignId?: string): Promise<void> {
   try {
-    await fetch(`${API_BASE_URL}/checkTrigger/`, {
+    const url = new URL(`${API_BASE_URL}/checkTrigger/`);
+    if (campaignId) {
+      url.searchParams.append('campaign_id', campaignId);
+    }
+
+    await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
