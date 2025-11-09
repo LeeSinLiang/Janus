@@ -66,8 +66,8 @@ def nodesJSON(request):
 	serializer = PostSerializer(posts, many=True)
 	metricsData = getMetricsDB()
 
-	# Get first 4 published posts with metrics for the chart view
-	published_posts = Post.objects.filter(status="published").select_related('metrics').order_by('created_at')[:4]
+	# Get most recent 4 published posts with metrics for the chart view
+	published_posts = Post.objects.filter(status="published").select_related('metrics').order_by('-created_at')[:4]
 	post_metrics = []
 	for post in published_posts:
 		m = getattr(post, "metrics", None)
