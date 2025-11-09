@@ -61,15 +61,34 @@ def getMetricsAI(pk):
 	return output
 
 @api_view(['GET'])
+def checkTrigger(request):
+	publishedPosts = Post.objects.filter(status="published").select_related('metrics').order_by('created_at')
+	triggeredPosts = []
+	for post in publishedPosts:
+		if (post.trigger == "like"):
+			if (post.metrics.likes >= 1):
+				triggeredPosts.append(post.pk)
+		elif (post.trigger == "retweet"):
+			if (post.metrics.retweets >= 1):
+				triggeredPosts.append(post.pk)
+	
+	if (triggeredPosts):
+		print("Triggered posts:", triggeredPosts)
+		# callSinAgentAPI(triggeredPosts)
+
+@api_view(['GET'])
 def nodesJSON(request):
 	posts = Post.objects.filter(campaign=Campaign.objects.first())
 	serializer = PostSerializer(posts, many=True)
 	metricsData = getMetricsDB()
 
-	# Get first 4 published posts with metrics for the chart view
-	published_posts = Post.objects.filter(status="published").select_related('metrics').order_by('created_at')[:4]
+	publishedPosts = Post.objects.filter(status="published").select_related('metrics').order_by('created_at')
+
+	#first 4 published posts with metrics for the chart view	
+	chartPosts = publishedPosts[:4]
+
 	post_metrics = []
-	for post in published_posts:
+	for post in chartPosts:
 		m = getattr(post, "metrics", None)
 		post_metrics.append({
 			"pk": post.pk,
@@ -100,8 +119,7 @@ def createXPost(request):
 		variant = ContentVariant.objects.filter(variant_id=post.selected_variant, post=post).first()
 		text = variant.content if variant else post.description
 	else:
-		
-		variant = ContentVariant.objects.filter(variant_id="A", post=post).first()
+		variant = ContentVariant.objects.filter(variant_id="B", post=post).first()
 		text = variant.content if variant else post.description
 
 	# Use clone API instead of real Twitter API

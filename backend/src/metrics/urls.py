@@ -12,5 +12,5 @@ urlpatterns = [
     path('api/approve', views.approveNode, name='approveNode'),
     path('api/graph', views.rejectNode, name='rejectNode'),
     path('setTrigger/', views.setTrigger, name='setTrigger'),
-    
+    path('checkTrigger/', views.checkTrigger, name='checkTrigger'),
 ]
