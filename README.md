@@ -13,17 +13,19 @@ Marketing isn’t blocked by content creation, it’s blocked by iteration speed
 5. API Integrations: X (Twitter), Instagram, ProductHunt, etc<br><br>
 
 **🏗️ Architecture**<br>
-flowchart LR<br>\t
-  U[Founder UI (Next.js + Tailwind + ReactFlow)] -->|Actions/Approval| API[(Django DRF)]<br>
-  API -->|Prompts/Tools| Orchestrator[LangChain + LangGraph]<br>
-  Orchestrator -->|Agents| Strategy[Strategy Planner]<br>
-  Orchestrator --> Content[Content Generator]<br>
-  Orchestrator --> Posting[Platform Poster]<br>
-  Orchestrator --> Metrics[Metrics Analyzer]<br>
-  Metrics --> Store[(DB/SQLite)]<br>
-  Posting -->|X/IG/PH SDKs| Channels{{X • Instagram • Product Hunt}}<br>
-  Store --> API<br>
-  API --> U<br><br>
+```
+flowchart LR
+  U[Founder UI (Next.js + Tailwind + ReactFlow)] -->|Actions/Approval| API[(Django DRF)]
+  API -->|Prompts/Tools| Orchestrator[LangChain + LangGraph]
+  Orchestrator -->|Agents| Strategy[Strategy Planner]
+  Orchestrator --> Content[Content Generator]
+  Orchestrator --> Posting[Platform Poster]
+  Orchestrator --> Metrics[Metrics Analyzer]
+  Metrics --> Store[(DB/SQLite)]
+  Posting -->|X/IG/PH SDKs| Channels{{X • Instagram • Product Hunt}}
+  Store --> API
+  API --> U
+```
 
 **🛠️ Tech Stack**<br>
 Backend: Django, DRF, LangChain, LangGraph, Google Gemini Generative AI<br>
@@ -45,19 +47,25 @@ _**Monorepo layout**_<br>
 ```
 
 _**1) Clone**_<br>
-git clone https://github.com/LeeSinLiang/Janus.git<br>
-cd Janus<br><br>
+```
+git clone https://github.com/LeeSinLiang/Janus.git
+cd Janus
+```
 
 _**2) Backend**_<br>
-cd backend<br>
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate<br>
-pip install -r requirements.txt<br>
-cp .env.example .env<br>
-cd src<br>
-python manage.py migrate<br>
-python manage.py runserver<br><br>
+```
+cd backend
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+cd src
+python manage.py migrate
+python manage.py runserver
+```
 
 _**3) Frontend**_<br>
-cd ../../frontend/janus<br>
-npm install<br>
-npm run dev<br>
+```
+cd ../../frontend/janus
+npm install
+npm run dev
+```
