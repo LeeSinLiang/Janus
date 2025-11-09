@@ -37,4 +37,4 @@ class ContentVariantSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ContentVariant
-        fields = ('variant_id', 'content', 'platform', 'metadata', 'asset')
+        fields = ('variant_id', 'content', 'platform', 'metadata', 'asset', 'created_at')

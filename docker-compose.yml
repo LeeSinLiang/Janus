@@ -10,10 +10,9 @@ services:
       - "3000:3000"  # Frontend
       - "8000:8000"  # Backend
     volumes:
-      # Persist database
-      - ./backend/src/db.sqlite3:/app/backend/src/db.sqlite3
+      # Persist database (mount parent dir to avoid file vs directory issue)
+      - ./backend/src:/app/backend/src
       # Persist media files
-      - ./backend/src/media:/app/backend/src/media
       - ./backend/generated_videos:/app/backend/generated_videos
       # Mount .env file
       - ./.env:/app/backend/.env
