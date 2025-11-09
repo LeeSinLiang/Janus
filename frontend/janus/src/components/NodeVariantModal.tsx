@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { Variant } from '@/types/api';
 import { API_BASE_URL } from '@/services/api';
+import VariantMetricsBox from './VariantMetricsBox';
 
 // Helper function to determine media type based on file extension
 function getMediaType(assetUrl: string): 'image' | 'video' | null {
@@ -34,6 +35,19 @@ function getFullAssetUrl(assetPath: string): string {
   const path = assetPath.startsWith('/') ? assetPath : `/${assetPath}`;
 
   return `${baseUrl}${path}`;
+}
+
+// Generate mock metrics for variants
+function generateMockMetrics(variantId: string) {
+  // Generate different mock data for variant A vs B
+  const seed = variantId === 'A' ? 1 : 2;
+
+  return {
+    likes: seed === 1 ? 3400 : 2800,
+    retweets: seed === 1 ? 1200 : 1500,
+    comments: seed === 1 ? 450 : 520,
+    positivity: seed === 1 ? 78 : 85,
+  };
 }
 
 interface NodeVariantModalProps {
@@ -120,11 +134,12 @@ export default function NodeVariantModal({
 
         {/* Two variants side by side */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {/* Variant 1 */}
-          <button
-            onClick={() => onSelectVariant?.(1)}
-            className="group rounded-xl border-2 border-zinc-200 p-6 text-left transition-all hover:border-blue-400 hover:bg-blue-50/50"
-          >
+          {/* Variant 1 Container */}
+          <div>
+            <button
+              onClick={() => onSelectVariant?.(1)}
+              className="w-full group rounded-xl border-2 border-zinc-200 p-6 text-left transition-all hover:border-blue-400 hover:bg-blue-50/50"
+            >
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-zinc-900 mb-2">
                 Version {variant1.variant_id}
@@ -189,13 +204,18 @@ export default function NodeVariantModal({
                 <p className="text-xs text-zinc-600 italic">{variant1.metadata.reasoning}</p>
               </div>
             )}
-          </button>
+            </button>
 
-          {/* Variant 2 */}
-          <button
-            onClick={() => onSelectVariant?.(2)}
-            className="group rounded-xl border-2 border-zinc-200 p-6 text-left transition-all hover:border-blue-400 hover:bg-blue-50/50"
-          >
+            {/* Metrics for Variant 1 */}
+            <VariantMetricsBox metrics={generateMockMetrics(variant1.variant_id)} />
+          </div>
+
+          {/* Variant 2 Container */}
+          <div>
+            <button
+              onClick={() => onSelectVariant?.(2)}
+              className="w-full group rounded-xl border-2 border-zinc-200 p-6 text-left transition-all hover:border-blue-400 hover:bg-blue-50/50"
+            >
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-zinc-900 mb-2">
                 Version {variant2.variant_id}
@@ -260,7 +280,11 @@ export default function NodeVariantModal({
                 <p className="text-xs text-zinc-600 italic">{variant2.metadata.reasoning}</p>
               </div>
             )}
-          </button>
+            </button>
+
+            {/* Metrics for Variant 2 */}
+            <VariantMetricsBox metrics={generateMockMetrics(variant2.variant_id)} />
+          </div>
         </div>
       </div>
     </div>
