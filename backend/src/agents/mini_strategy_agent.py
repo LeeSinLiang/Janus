@@ -49,7 +49,8 @@ class MiniStrategyAgent:
         self.agent = create_agent(
             self.model,
             tools=[],  # No external tools needed
-            system_prompt=self._get_system_prompt()
+            system_prompt=self._get_system_prompt(),
+            response_format=MiniStrategyOutput
         )
 
         # Agent name for reference

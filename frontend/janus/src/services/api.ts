@@ -381,10 +381,11 @@ export async function checkTrigger(): Promise<void> {
 
 /**
  * Send multi-node prompt - sends POST request with selected node pks and user prompt
+ * Generates a new post based on selected posts
  */
-export async function sendMultiNodePrompt(nodes: number[], prompt: string): Promise<void> {
+export async function sendMultiNodePrompt(nodes: number[], prompt: string): Promise<any> {
   try {
-    const response = await fetch(`${API_BASE_URL}/sintodo`, {
+    const response = await fetch(`${API_BASE_URL}/api/agents/generate-new-post/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -395,6 +396,9 @@ export async function sendMultiNodePrompt(nodes: number[], prompt: string): Prom
     if (!response.ok) {
       throw new Error(`Failed to send multi-node prompt: ${response.statusText}`);
     }
+
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('Error sending multi-node prompt:', error);
     throw error;
