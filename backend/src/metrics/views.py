@@ -223,3 +223,90 @@ def rejectNode(request):
 		return Response({
 			"error": f"Post with pk={pk} not found"
 		}, status=404)
+
+@api_view(['POST'])
+def approveAllNodes(request):
+	"""Approve all draft posts in a campaign and publish them to X"""
+	campaign_id = request.data.get("campaign_id")
+
+	if not campaign_id:
+		return Response({"error": "Missing 'campaign_id' field"}, status=400)
+
+	try:
+		# Get the campaign
+		campaign = Campaign.objects.get(campaign_id=campaign_id)
+
+		# Find all draft posts for this campaign
+		draft_posts = Post.objects.filter(campaign=campaign, status='draft')
+
+		if not draft_posts.exists():
+			return Response({
+				"success": True,
+				"message": "No draft posts found to approve",
+				"approved_count": 0,
+				"campaign_id": campaign_id
+			}, status=200)
+
+		approved_count = 0
+		failed_posts = []
+
+		# Approve each draft post and create X post
+		for post in draft_posts:
+			try:
+				# Get the selected variant or default to variant A
+				if post.selected_variant:
+					variant = ContentVariant.objects.filter(variant_id=post.selected_variant, post=post).first()
+					text = variant.content if variant else post.description
+				else:
+					variant = ContentVariant.objects.filter(variant_id="A", post=post).first()
+					text = variant.content if variant else post.description
+
+				# Create X post via clone API
+				url = "http://localhost:8000/clone/2/tweets"
+				headers = {"Content-Type": "application/json"}
+				body = {"text": text}
+
+				resp = requests.post(url, headers=headers, json=body)
+
+				if resp.status_code == 201:
+					data = resp.json()
+					tweet_id = data.get("data", {}).get("id")
+
+					if tweet_id:
+						# Update post metrics with tweet_id
+						post_metrics = post.metrics
+						if post_metrics:
+							post_metrics.tweet_id = tweet_id
+							post_metrics.save()
+
+					# Update post status to published
+					post.status = 'published'
+					post.save()
+					approved_count += 1
+				else:
+					failed_posts.append({"post_id": post.pk, "title": post.title, "error": "Failed to create X post"})
+
+			except Exception as e:
+				failed_posts.append({"post_id": post.pk, "title": post.title, "error": str(e)})
+
+		response_data = {
+			"success": True,
+			"message": f"Approved and published {approved_count} draft post(s)",
+			"approved_count": approved_count,
+			"campaign_id": campaign_id
+		}
+
+		if failed_posts:
+			response_data["failed_posts"] = failed_posts
+			response_data["message"] += f" ({len(failed_posts)} failed)"
+
+		return Response(response_data, status=200)
+
+	except Campaign.DoesNotExist:
+		return Response({
+			"error": f"Campaign with campaign_id='{campaign_id}' not found"
+		}, status=404)
+	except Exception as e:
+		return Response({
+			"error": f"An error occurred: {str(e)}"
+		}, status=500)

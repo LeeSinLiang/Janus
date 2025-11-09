@@ -133,6 +133,31 @@ export async function approveNode(nodePk: string): Promise<void> {
 }
 
 /**
+ * Approve all draft nodes in a campaign - sends POST request with campaign_id
+ */
+export async function approveAllNodes(campaignId: string): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/approveAll`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ campaign_id: campaignId }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to approve all nodes: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error approving all nodes:', error);
+    throw error;
+  }
+}
+
+/**
  * Create X post from a node - sends POST request with node pk
  */
 export async function createXPost(nodePk: string): Promise<any> {
