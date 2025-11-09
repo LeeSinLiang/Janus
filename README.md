@@ -1,61 +1,61 @@
-**✨ Overview**\n
-Janus is an AI-native, multi-agent GTM OS that automates strategy, content, posting, and feedback loops. It visualizes campaigns as graphs, adapts creatives from real-time metrics, and keeps a human in the loop for approvals, essentially following this workflow: \n
-Strategize and Plan → Create Content (text, images, videos) → Post Content (X, ProductHunt, Instagram, etc) → Measure Metrics (likes, retweets, comments, shares, etc) → Adapt Strategy — on autopilot, with your sign-off.\n\n
+**✨ Overview**<br>
+Janus is an AI-native, multi-agent GTM OS that automates strategy, content, posting, and feedback loops. It visualizes campaigns as graphs, adapts creatives from real-time metrics, and keeps a human in the loop for approvals, essentially following this workflow: <br>
+Strategize and Plan → Create Content (text, images, videos) → Post Content (X, ProductHunt, Instagram, etc) → Measure Metrics (likes, retweets, comments, shares, etc) → Adapt Strategy — on autopilot, with your sign-off.<br><br>
 
-**🧠 Why**\n
-Marketing isn’t blocked by content creation, it’s blocked by iteration speed. Janus accelerates learning cycles across channels (X, Instagram, ProductHunt, and more soon) and routes the next best action automatically.\n\n
+**🧠 Why**<br>
+Marketing isn’t blocked by content creation, it’s blocked by iteration speed. Janus accelerates learning cycles across channels (X, Instagram, ProductHunt, and more soon) and routes the next best action automatically.<br><br>
 
-**🧩 Features**\n
-1. Canvas OS: node-based campaign builder (phases, posts, A/B arms, triggers)\n
-2. Multi-Agent Orchestration: 3-layer supervisor + specialist sub-agents\n
-3. Human-in-the-Loop: explicit approval gates before posting/edits\n
-4. Metrics-Driven Adaptation: rewrite, reschedule, or reroute based on KPIs\n
-5. API Integrations: X (Twitter), Instagram, ProductHunt, etc\n\n
+**🧩 Features**<br>
+1. Canvas OS: node-based campaign builder (phases, posts, A/B arms, triggers)<br>
+2. Multi-Agent Orchestration: 3-layer supervisor + specialist sub-agents<br>
+3. Human-in-the-Loop: explicit approval gates before posting/edits<br>
+4. Metrics-Driven Adaptation: rewrite, reschedule, or reroute based on KPIs<br>
+5. API Integrations: X (Twitter), Instagram, ProductHunt, etc<br><br>
 
-**🏗️ Architecture**\n
-flowchart LR\n\t
-  U[Founder UI (Next.js + Tailwind + ReactFlow)] -->|Actions/Approval| API[(Django DRF)]\n
-  API -->|Prompts/Tools| Orchestrator[LangChain + LangGraph]\n
-  Orchestrator -->|Agents| Strategy[Strategy Planner]\n
-  Orchestrator --> Content[Content Generator]\n
-  Orchestrator --> Posting[Platform Poster]\n
-  Orchestrator --> Metrics[Metrics Analyzer]\n
-  Metrics --> Store[(DB/SQLite)]\n
-  Posting -->|X/IG/PH SDKs| Channels{{X • Instagram • Product Hunt}}\n
-  Store --> API\n
-  API --> U\n\n
+**🏗️ Architecture**<br>
+flowchart LR<br>\t
+  U[Founder UI (Next.js + Tailwind + ReactFlow)] -->|Actions/Approval| API[(Django DRF)]<br>
+  API -->|Prompts/Tools| Orchestrator[LangChain + LangGraph]<br>
+  Orchestrator -->|Agents| Strategy[Strategy Planner]<br>
+  Orchestrator --> Content[Content Generator]<br>
+  Orchestrator --> Posting[Platform Poster]<br>
+  Orchestrator --> Metrics[Metrics Analyzer]<br>
+  Metrics --> Store[(DB/SQLite)]<br>
+  Posting -->|X/IG/PH SDKs| Channels{{X • Instagram • Product Hunt}}<br>
+  Store --> API<br>
+  API --> U<br><br>
 
-**🛠️ Tech Stack**\n
-Backend: Django, DRF, LangChain, LangGraph, Google Gemini Generative AI\n
-Frontend: Next.js (React), Tailwind, ReactFlow, Mermaid\n
-Data/Infra: SQLite (dev), Vultr (deploy)\n\n
+**🛠️ Tech Stack**<br>
+Backend: Django, DRF, LangChain, LangGraph, Google Gemini Generative AI<br>
+Frontend: Next.js (React), Tailwind, ReactFlow, Mermaid<br>
+Data/Infra: SQLite (dev), Vultr (deploy)<br><br>
 
-**🚦 Project Status**\n
-Actively evolving during and after the hackathon, aiming to launch as a startup.\n\n
+**🚦 Project Status**<br>
+Actively evolving during and after the hackathon, aiming to launch as a startup.<br><br>
 
-**⚡ Quickstart**\n
-_**Monorepo layout**_\n
-.\n
-├── backend/\n
-│   ├── requirements.txt\n
-│   └── src/  # manage.py lives here\n
-└── frontend/\n
-    └── janus/  # Next.js app\n\n
+**⚡ Quickstart**<br>
+_**Monorepo layout**_<br>
+.<br>
+├── backend/<br>
+│   ├── requirements.txt<br>
+│   └── src/  # manage.py lives here<br>
+└── frontend/<br>
+    └── janus/  # Next.js app<br><br>
 
-_**1) Clone**_\n
-git clone https://github.com/LeeSinLiang/Janus.git\n
-cd Janus\n\n
+_**1) Clone**_<br>
+git clone https://github.com/LeeSinLiang/Janus.git<br>
+cd Janus<br><br>
 
-_**2) Backend**_\n
-cd backend\n
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate\n
-pip install -r requirements.txt\n
-cp .env.example .env\n
-cd src\n
-python manage.py migrate\n
-python manage.py runserver\n\n
+_**2) Backend**_<br>
+cd backend<br>
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate<br>
+pip install -r requirements.txt<br>
+cp .env.example .env<br>
+cd src<br>
+python manage.py migrate<br>
+python manage.py runserver<br><br>
 
-_**3) Frontend**_\n
-cd ../../frontend/janus\n
-npm install\n
-npm run dev\n
+_**3) Frontend**_<br>
+cd ../../frontend/janus<br>
+npm install<br>
+npm run dev<br>
