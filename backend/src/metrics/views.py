@@ -10,7 +10,6 @@ from twitter_clone.models import CloneComment
 from .serializer import PostMetricsSerializer, PostSerializer, ContentVariantSerializer
 from agents.models import Post, ContentVariant, Campaign
 from requests_oauthlib import OAuth1
-from time import time
 from django.core.cache import cache
 from agents import create_trigger_parser
 from django.db import connection, transaction
