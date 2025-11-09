@@ -485,7 +485,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
             onConnect={onConnect}
             nodeTypes={nodeTypes}
             fitView
-            fitViewOptions={{ padding: {left: 0.3, top: 0.3, right: 0.3, bottom: 1.5} }}
+            fitViewOptions={{ padding: {left: 0.3, top: 0.7, right: 0.3, bottom: 1.1} }}
           >
             <Controls />
             <Background color="#e5e7eb" variant={BackgroundVariant.Dots} gap={16} size={4} />
