@@ -10,9 +10,24 @@ class PostMetricsSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PostSerializer(serializers.ModelSerializer):
+    assets_ready = serializers.SerializerMethodField()
+
     class Meta:
         model = Post
-        fields = ('pk', 'title', 'description', 'next_posts', 'phase', 'status')
+        fields = ('pk', 'title', 'description', 'next_posts', 'phase', 'status', 'assets_ready')
+
+    def get_assets_ready(self, obj):
+        """Check if both variant A and B have assets (images) ready"""
+        try:
+            variant_a = ContentVariant.objects.filter(post=obj, variant_id='A').first()
+            variant_b = ContentVariant.objects.filter(post=obj, variant_id='B').first()
+
+            # Both variants must exist and have assets
+            if variant_a and variant_b:
+                return bool(variant_a.asset) and bool(variant_b.asset)
+            return False
+        except Exception:
+            return False
 
 class ContentVariantSerializer(serializers.ModelSerializer):
     asset = serializers.FileField(required=False, allow_null=True)
