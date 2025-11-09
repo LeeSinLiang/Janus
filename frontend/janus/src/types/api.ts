@@ -24,6 +24,7 @@ export interface PostMetrics {
   likes: number;
   retweets: number;
   impressions: number;
+  comments: number;
 }
 
 export interface GraphResponse {

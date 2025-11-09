@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Node } from '@xyflow/react';
+import { sendTrigger } from '@/services/api';
 
 interface RejectionState {
   nodeId: string;
@@ -138,7 +139,7 @@ export default function ChatBox({
   };
 
   // Handle message submission
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!message.trim()) return;
 
     if (rejectionState) {
@@ -146,7 +147,32 @@ export default function ChatBox({
       onRejectionSubmit?.(message.trim());
       setMessage('');
     } else {
-      // Normal message mode - handle normally (you can implement this later)
+      // Normal message mode - parse for trigger
+      // Extract node title from **Node Title** format
+      const nodeMatch = message.match(/\*\*([^*]+)\*\*/);
+      const nodeTitle = nodeMatch ? nodeMatch[1] : null;
+
+      // Extract trigger from **1 like** or **1 retweet** format
+      const triggerMatch = message.match(/\*\*(1 (like|retweet))\*\*/);
+      const triggerText = triggerMatch ? triggerMatch[2] : null;
+
+      // If both node and trigger found, send trigger request
+      if (nodeTitle && triggerText) {
+        // Find node pk by title
+        const node = nodeOptions.find(n => n.title === nodeTitle);
+        if (node) {
+          const nodePk = parseInt(node.id);
+          const trigger = triggerText as 'like' | 'retweet';
+
+          try {
+            await sendTrigger(nodePk, trigger);
+            console.log(`Trigger sent: ${trigger} for node ${nodePk}`);
+          } catch (error) {
+            console.error('Failed to send trigger:', error);
+          }
+        }
+      }
+
       console.log('Sin is so corny bhai macha:', message);
       setMessage('');
     }

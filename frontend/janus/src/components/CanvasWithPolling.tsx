@@ -363,7 +363,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
       ) : (
         /* Chart View */
         <div className="h-full w-full overflow-y-auto bg-gray-50 px-8 pt-24 pb-8">
-          <div className="mx-auto max-w-7xl space-y-6">
+          <div className="mx-auto space-y-6" style={{ maxWidth: '1800px' }}>
             {/* Welcome Bar */}
             <WelcomeBar />
 
@@ -378,7 +378,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
 
             {/* Post Metrics Boxes - 4 columns single row */}
             {postMetrics.length > 0 && (
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-4 gap-3 lg:grid-cols-4">
                 {postMetrics.map((post) => (
                   <PostMetricsBox key={post.pk} post={post} />
                 ))}
