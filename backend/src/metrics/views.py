@@ -22,11 +22,20 @@ def getMetricsDB():
 	out = {}
 	for post in posts:
 		m = getattr(post, "metrics", None)
-		out[int(post.pk)] = {
-			"likes": m.likes if m else 0,
-			"comments": m.comments if m else 0,
-			"retweets": m.retweets if m else 0,
-		}
+		if m:
+			# Use max metrics (winner of A and B) for canvas display
+			max_metrics = m.get_max_metrics()
+			out[int(post.pk)] = {
+				"likes": max_metrics['likes'],
+				"comments": max_metrics['comments'],
+				"retweets": max_metrics['retweets'],
+			}
+		else:
+			out[int(post.pk)] = {
+				"likes": 0,
+				"comments": 0,
+				"retweets": 0,
+			}
 	return out
 
 @api_view(['POST'])
@@ -215,15 +224,28 @@ def nodesJSON(request):
 	post_metrics = []
 	for post in chartPosts:
 		m = getattr(post, "metrics", None)
-		post_metrics.append({
-			"pk": post.pk,
-			"title": post.title,
-			"description": post.description,
-			"likes": m.likes if m else 0,
-			"retweets": m.retweets if m else 0,
-			"impressions": m.impressions if m else 0,
-			"comments": m.comments if m else 0,
-		})
+		if m:
+			# Use aggregated metrics (sum of A and B) for chart view
+			aggregated = m.get_aggregated_metrics()
+			post_metrics.append({
+				"pk": post.pk,
+				"title": post.title,
+				"description": post.description,
+				"likes": aggregated['likes'],
+				"retweets": aggregated['retweets'],
+				"impressions": aggregated['impressions'],
+				"comments": aggregated['comments'],
+			})
+		else:
+			post_metrics.append({
+				"pk": post.pk,
+				"title": post.title,
+				"description": post.description,
+				"likes": 0,
+				"retweets": 0,
+				"impressions": 0,
+				"comments": 0,
+			})
 
 	return Response({
 		"diagram": serializer.data,
@@ -240,40 +262,77 @@ def createXPost(request):
 
 	post = Post.objects.get(pk=pk)
 
-	
-	if post.selected_variant:
-		variant = ContentVariant.objects.filter(variant_id=post.selected_variant, post=post).first()
-		text = variant.content if variant else post.description
-		media_name = getattr(getattr(variant, "asset", None), "name", None)
-	else:
-		variant = ContentVariant.objects.filter(variant_id="B", post=post).first()
-		text = variant.content if variant else post.description
-		media_name = getattr(getattr(variant, "asset", None), "name", None)
+	# Get both variants A and B
+	variant_a = ContentVariant.objects.filter(variant_id="A", post=post).first()
+	variant_b = ContentVariant.objects.filter(variant_id="B", post=post).first()
 
-	# Use clone API instead of real Twitter API
-	url = f"http://localhost:8000/clone/2/tweets"
-	headers = {
-		"Content-Type": "application/json"
+	results = {}
+	errors = []
+
+	# Post variant A
+	if variant_a:
+		text_a = variant_a.content
+		media_a = getattr(getattr(variant_a, "asset", None), "name", None)
+
+		try:
+			resp_a = requests.post(
+				"http://localhost:8000/clone/2/tweets",
+				headers={"Content-Type": "application/json"},
+				json={"text": text_a, "media": media_a}
+			)
+			if resp_a.status_code == 201:
+				tweet_id_a = resp_a.json().get("data", {}).get("id")
+				results['A'] = tweet_id_a
+			else:
+				errors.append(f"Variant A failed: {resp_a.text}")
+		except Exception as e:
+			errors.append(f"Variant A error: {str(e)}")
+
+	# Post variant B
+	if variant_b:
+		text_b = variant_b.content
+		media_b = getattr(getattr(variant_b, "asset", None), "name", None)
+
+		try:
+			resp_b = requests.post(
+				"http://localhost:8000/clone/2/tweets",
+				headers={"Content-Type": "application/json"},
+				json={"text": text_b, "media": media_b}
+			)
+			if resp_b.status_code == 201:
+				tweet_id_b = resp_b.json().get("data", {}).get("id")
+				results['B'] = tweet_id_b
+			else:
+				errors.append(f"Variant B failed: {resp_b.text}")
+		except Exception as e:
+			errors.append(f"Variant B error: {str(e)}")
+
+	# Update PostMetrics with both tweet_ids (A/B structure)
+	postMetrics = post.metrics
+	if postMetrics:
+		# Preserve existing structure, update tweet_ids
+		current_tweet_ids = postMetrics.tweet_id if isinstance(postMetrics.tweet_id, dict) else {}
+		current_tweet_ids.update(results)
+		postMetrics.tweet_id = current_tweet_ids
+		postMetrics.save()
+
+	# Mark post as published if at least one variant was posted
+	if results:
+		post.status = "published"
+		# Set posted_time for trigger evaluation
+		from django.utils import timezone
+		post.posted_time = timezone.now()
+		post.save()
+
+	response_data = {
+		"success": bool(results),
+		"tweet_ids": results,
 	}
-	body = {"text": text, "media": media_name}
 
-	resp = requests.post(url, headers=headers, json=body)
-	data = resp.json()
+	if errors:
+		response_data["errors"] = errors
 
-	if resp.status_code == 201:
-		tweet_id = (data.get("data")).get("id")
-		if tweet_id:
-			postMetrics = post.metrics
-			if postMetrics:
-				postMetrics.tweet_id = tweet_id
-				postMetrics.save()
-			post.status = "published"
-			# Set posted_time for trigger evaluation
-			from django.utils import timezone
-			post.posted_time = timezone.now()
-			post.save()
-
-	return Response(resp.json(), status=resp.status_code)
+	return Response(response_data, status=201 if results else 400)
 
 @api_view(['POST'])
 def getXPostMetrics(request):
@@ -283,44 +342,91 @@ def getXPostMetrics(request):
 
 	post = Post.objects.get(pk=pk)
 	postMetrics = post.metrics
-	tweet_id = postMetrics.tweet_id
+	tweet_ids = postMetrics.tweet_id  # Now a dict: {"A": "123", "B": "456"}
+
+	# Initialize metrics storage
+	metrics_results = {
+		"likes": {},
+		"retweets": {},
+		"impressions": {},
+		"comments": {},
+		"commentList": {}
+	}
 
 	# Use clone API instead of real Twitter API
 	url = f"http://localhost:8000/clone/2/metrics/"
-	headers = {
-		"Content-Type": "application/json"
-	}
-	body = {"tweet_ids": tweet_id}
+	headers = {"Content-Type": "application/json"}
 
-	resp = requests.post(url, headers=headers, json=body)
-	data = resp.json()
+	# Fetch metrics for both variants
+	for variant in ['A', 'B']:
+		tweet_id = tweet_ids.get(variant) if isinstance(tweet_ids, dict) else None
 
-	if resp.status_code != 200:
-		return Response({"error": resp.text}, status=resp.status_code)
-	
-	data = resp.json()
-	items = data.get("data") or []
-	if not items:
-		return Response({"error": "Tweet not found in clone API."}, status=404)
+		# Skip if no tweet_id for this variant (backward compatibility)
+		if not tweet_id:
+			metrics_results["likes"][variant] = 0
+			metrics_results["retweets"][variant] = 0
+			metrics_results["impressions"][variant] = 0
+			metrics_results["comments"][variant] = 0
+			metrics_results["commentList"][variant] = []
+			continue
 
-	d = items[0]
-	pub = d.get("public_metrics", {})
-	nonpub = d.get("non_public_metrics", {})
+		# Fetch metrics for this variant
+		body = {"tweet_ids": tweet_id}
+		resp = requests.post(url, headers=headers, json=body)
 
-	retweetCount = pub.get("retweet_count")
-	likeCount = pub.get("like_count")
-	commentCount = pub.get("reply_count")
-	impressionCount = nonpub.get("impression_count")
-	commentList = CloneComment.objects.filter(tweet__tweet_id=tweet_id).order_by('-created_at').values_list('text', flat=True)
+		if resp.status_code != 200:
+			# If API call fails, set metrics to 0
+			metrics_results["likes"][variant] = 0
+			metrics_results["retweets"][variant] = 0
+			metrics_results["impressions"][variant] = 0
+			metrics_results["comments"][variant] = 0
+			metrics_results["commentList"][variant] = []
+			continue
 
-	postMetrics.retweets = retweetCount
-	postMetrics.likes = likeCount
-	postMetrics.impressions = impressionCount
-	postMetrics.comments = commentCount
-	postMetrics.commentList = list(commentList)
+		data = resp.json()
+		items = data.get("data") or []
+
+		if not items:
+			# Tweet not found, set to 0
+			metrics_results["likes"][variant] = 0
+			metrics_results["retweets"][variant] = 0
+			metrics_results["impressions"][variant] = 0
+			metrics_results["comments"][variant] = 0
+			metrics_results["commentList"][variant] = []
+			continue
+
+		# Extract metrics from response
+		d = items[0]
+		pub = d.get("public_metrics", {})
+		nonpub = d.get("non_public_metrics", {})
+
+		metrics_results["retweets"][variant] = pub.get("retweet_count", 0)
+		metrics_results["likes"][variant] = pub.get("like_count", 0)
+		metrics_results["comments"][variant] = pub.get("reply_count", 0)
+		metrics_results["impressions"][variant] = nonpub.get("impression_count", 0)
+
+		# Get comment list
+		commentList = CloneComment.objects.filter(
+			tweet__tweet_id=tweet_id
+		).order_by('-created_at').values_list('text', flat=True)
+		metrics_results["commentList"][variant] = list(commentList)
+
+	# Update PostMetrics with A/B structure
+	postMetrics.likes = metrics_results["likes"]
+	postMetrics.retweets = metrics_results["retweets"]
+	postMetrics.impressions = metrics_results["impressions"]
+	postMetrics.comments = metrics_results["comments"]
+	postMetrics.commentList = metrics_results["commentList"]
 	postMetrics.save()
 
-	return Response(resp.json(), status=resp.status_code)
+	# Return aggregated response
+	return Response({
+		"status": "success",
+		"metrics": {
+			"A": postMetrics.get_variant_metrics('A'),
+			"B": postMetrics.get_variant_metrics('B')
+		}
+	}, status=200)
 
 @api_view(['GET'])
 def metricsJSON(request):
@@ -451,34 +557,61 @@ def approveAllNodes(request):
 		approved_count = 0
 		failed_posts = []
 
-		# Approve each draft post and create X post
+		# Approve each draft post and create X post for BOTH variants
 		for post in draft_posts:
 			try:
-				# Get the selected variant or default to variant A
-				if post.selected_variant:
-					variant = ContentVariant.objects.filter(variant_id=post.selected_variant, post=post).first()
-					text = variant.content if variant else post.description
-				else:
-					variant = ContentVariant.objects.filter(variant_id="A", post=post).first()
-					text = variant.content if variant else post.description
+				# Get both variants A and B
+				variant_a = ContentVariant.objects.filter(variant_id="A", post=post).first()
+				variant_b = ContentVariant.objects.filter(variant_id="B", post=post).first()
 
-				# Create X post via clone API
-				url = "http://localhost:8000/clone/2/tweets"
-				headers = {"Content-Type": "application/json"}
-				body = {"text": text}
+				results = {}
+				post_errors = []
 
-				resp = requests.post(url, headers=headers, json=body)
+				# Post variant A
+				if variant_a:
+					text_a = variant_a.content
+					media_a = getattr(getattr(variant_a, "asset", None), "name", None)
 
-				if resp.status_code == 201:
-					data = resp.json()
-					tweet_id = data.get("data", {}).get("id")
+					try:
+						resp_a = requests.post(
+							"http://localhost:8000/clone/2/tweets",
+							headers={"Content-Type": "application/json"},
+							json={"text": text_a, "media": media_a}
+						)
+						if resp_a.status_code == 201:
+							tweet_id_a = resp_a.json().get("data", {}).get("id")
+							results['A'] = tweet_id_a
+						else:
+							post_errors.append(f"Variant A failed: {resp_a.text}")
+					except Exception as e:
+						post_errors.append(f"Variant A error: {str(e)}")
 
-					if tweet_id:
-						# Update post metrics with tweet_id
-						post_metrics = post.metrics
-						if post_metrics:
-							post_metrics.tweet_id = tweet_id
-							post_metrics.save()
+				# Post variant B
+				if variant_b:
+					text_b = variant_b.content
+					media_b = getattr(getattr(variant_b, "asset", None), "name", None)
+
+					try:
+						resp_b = requests.post(
+							"http://localhost:8000/clone/2/tweets",
+							headers={"Content-Type": "application/json"},
+							json={"text": text_b, "media": media_b}
+						)
+						if resp_b.status_code == 201:
+							tweet_id_b = resp_b.json().get("data", {}).get("id")
+							results['B'] = tweet_id_b
+						else:
+							post_errors.append(f"Variant B failed: {resp_b.text}")
+					except Exception as e:
+						post_errors.append(f"Variant B error: {str(e)}")
+
+				# If at least one variant posted successfully
+				if results:
+					# Update post metrics with both tweet_ids
+					post_metrics = post.metrics
+					if post_metrics:
+						post_metrics.tweet_id = results  # {"A": "123", "B": "456"}
+						post_metrics.save()
 
 					# Update post status to published and set posted_time
 					from django.utils import timezone
@@ -486,8 +619,20 @@ def approveAllNodes(request):
 					post.posted_time = timezone.now()
 					post.save()
 					approved_count += 1
+
+					# Record any partial failures
+					if post_errors:
+						failed_posts.append({
+							"post_id": post.pk,
+							"title": post.title,
+							"error": f"Partial success: {', '.join(post_errors)}"
+						})
 				else:
-					failed_posts.append({"post_id": post.pk, "title": post.title, "error": "Failed to create X post"})
+					failed_posts.append({
+						"post_id": post.pk,
+						"title": post.title,
+						"error": f"Both variants failed: {', '.join(post_errors) if post_errors else 'No variants found'}"
+					})
 
 			except Exception as e:
 				failed_posts.append({"post_id": post.pk, "title": post.title, "error": str(e)})
