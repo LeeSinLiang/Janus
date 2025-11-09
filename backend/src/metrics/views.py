@@ -1,5 +1,5 @@
 from django.shortcuts import render
-import os, requests, time
+import os, requests, time, threading
 from dotenv import load_dotenv
 from django.conf import settings
 from .models import PostMetrics
@@ -13,6 +13,8 @@ from requests_oauthlib import OAuth1
 from time import time
 from django.core.cache import cache
 from agents import create_trigger_parser
+from django.db import connection, transaction
+from django.db.utils import OperationalError
 
 
 
@@ -123,18 +125,220 @@ def getMetricsAI(pk):
 	}
 	return output
 
+def retry_on_db_lock(func, max_retries=5, initial_delay=0.1):
+	"""
+	Retry a database operation with exponential backoff if it fails due to database lock.
+	"""
+	delay = initial_delay
+	last_exception = None
+
+	for attempt in range(max_retries):
+		try:
+			return func()
+		except OperationalError as e:
+			if "database is locked" in str(e).lower():
+				last_exception = e
+				if attempt < max_retries - 1:
+					time.sleep(delay)
+					delay *= 2
+			else:
+				raise
+	raise last_exception
+
+
+def regenerate_content_background(triggered_post_data):
+	"""
+	Background task to regenerate content for a triggered post.
+
+	This function:
+	1. Analyzes metrics with trigger context
+	2. Regenerates improved A/B content variants
+	3. Generates media assets for new variants
+	4. Updates post status to draft for user review
+	5. Clears trigger configuration
+
+	Args:
+		triggered_post_data: Dict with post_pk, trigger details, metrics, etc.
+	"""
+	# IMPORTANT: Close any existing database connections
+	connection.close()
+
+	try:
+		from agents.metrics_analyzer import create_metrics_analyzer
+		from agents.content_creator import create_content_creator, save_content_variants_for_post
+		from agents.media_creator import create_media_creator
+		import base64
+		from django.core.files.base import ContentFile
+
+		# Get the post object with retry
+		def get_post():
+			return Post.objects.get(pk=triggered_post_data["post_pk"])
+
+		post = retry_on_db_lock(get_post)
+
+		# Build metrics data for analysis
+		metrics_data = {
+			"variant_a": {
+				"condition": triggered_post_data["trigger_condition"],
+				"value": triggered_post_data["current_value_a"],
+				"content": post.variants.filter(variant_id='A').order_by('-created_at').first().content if post.variants.filter(variant_id='A').exists() else ""
+			},
+			"variant_b": {
+				"condition": triggered_post_data["trigger_condition"],
+				"value": triggered_post_data["current_value_b"],
+				"content": post.variants.filter(variant_id='B').order_by('-created_at').first().content if post.variants.filter(variant_id='B').exists() else ""
+			},
+			"elapsed_time_seconds": triggered_post_data["elapsed_time_seconds"]
+		}
+
+		# Step 1: Initialize agents (outside transaction)
+		print(f"[Trigger] Analyzing metrics for post {post.pk} ({post.title})...")
+		metrics_agent = create_metrics_analyzer()
+		content_agent = create_content_creator()
+		media_agent = create_media_creator(model_name='models/gemini-2.5-flash-image')
+
+		# Step 2: Execute metrics analyzer for trigger-specific analysis
+		analysis_report = metrics_agent.execute_trigger_analysis(
+			metrics_data=metrics_data,
+			condition=triggered_post_data["trigger_condition"],
+			trigger_value=triggered_post_data["trigger_value"],
+			comparison=triggered_post_data["trigger_comparison"],
+			trigger_prompt=triggered_post_data["trigger_prompt"],
+			triggered_variants=triggered_post_data["triggered_variants"]
+		)
+
+		print(f"[Trigger] Generating improved content for post {post.pk}...")
+
+		# Step 3: Get existing variants and campaign info
+		def get_post_data():
+			p = Post.objects.select_related('campaign').prefetch_related('variants').get(pk=post.pk)
+			return p, p.campaign
+
+		post, campaign = retry_on_db_lock(get_post_data)
+
+		existing_variants = post.variants.all().order_by('created_at')
+		old_content_parts = []
+		for variant in existing_variants:
+			old_content_parts.append(f"Variant {variant.variant_id}: {variant.content}")
+		old_content = "\n".join(old_content_parts)
+
+		product_info = campaign.metadata.get('product_info', '') if campaign.metadata else ''
+
+		# Step 4: Generate improved content using execute_with_metrics
+		content_output = content_agent.execute_with_metrics(
+			title=post.title,
+			description=post.description,
+			product_info=product_info,
+			old_content=old_content,
+			analyzed_report=analysis_report.analysis
+		)
+
+		print(f"[Trigger] Saving new variants with media for post {post.pk}...")
+
+		# Step 5: Create NEW ContentVariant records with media (keep old ones for history)
+		def create_variant_a():
+			with transaction.atomic():
+				return ContentVariant.objects.create(
+					post=post,
+					variant_id='A',
+					content=content_output.A,
+					platform='X',
+					metadata={'image_caption': content_output.A_image_caption, 'regenerated': True}
+				)
+
+		variant_a = retry_on_db_lock(create_variant_a)
+
+		# Generate and save media for Variant A
+		try:
+			asset_a = media_agent.create_image(prompt=content_output.A_image_caption)
+			mime_type = asset_a['mime_type']
+			ext = mime_type.split('/')[-1]
+			data = ContentFile(base64.b64decode(asset_a['data']))
+
+			def save_variant_a_asset():
+				variant_a.asset.save(f'variant_a_image_{post.post_id}_{int(time.time())}.{ext}', data, save=True)
+
+			retry_on_db_lock(save_variant_a_asset)
+			print(f"[Trigger] Generated media for variant A")
+		except Exception as e:
+			print(f"[Trigger] Warning: Failed to generate image for variant A: {e}")
+
+		# Create Variant B
+		def create_variant_b():
+			with transaction.atomic():
+				return ContentVariant.objects.create(
+					post=post,
+					variant_id='B',
+					content=content_output.B,
+					platform='X',
+					metadata={'image_caption': content_output.B_image_caption, 'regenerated': True}
+				)
+
+		variant_b = retry_on_db_lock(create_variant_b)
+
+		# Generate and save media for Variant B
+		try:
+			asset_b = media_agent.create_image(prompt=content_output.B_image_caption)
+			mime_type = asset_b['mime_type']
+			ext = mime_type.split('/')[-1]
+			data = ContentFile(base64.b64decode(asset_b['data']))
+
+			def save_variant_b_asset():
+				variant_b.asset.save(f'variant_b_image_{post.post_id}_{int(time.time())}.{ext}', data, save=True)
+
+			retry_on_db_lock(save_variant_b_asset)
+			print(f"[Trigger] Generated media for variant B")
+		except Exception as e:
+			print(f"[Trigger] Warning: Failed to generate image for variant B: {e}")
+
+		# Step 6: Update post status and clear trigger
+		def update_post_status():
+			with transaction.atomic():
+				p = Post.objects.get(pk=post.pk)
+				p.status = 'draft'
+				p.trigger_condition = None
+				p.trigger_value = None
+				p.trigger_comparison = None
+				p.trigger_prompt = None
+				p.save()
+
+		retry_on_db_lock(update_post_status)
+
+		print(f"✅ [Trigger] Successfully regenerated content for post {post.pk} ({post.title})")
+		print(f"   New Variant A: {content_output.A[:50]}...")
+		print(f"   New Variant B: {content_output.B[:50]}...")
+
+	except Exception as e:
+		print(f"❌ [Trigger] Error regenerating content for post {triggered_post_data.get('post_pk', 'unknown')}: {e}")
+		import traceback
+		traceback.print_exc()
+
+	finally:
+		# Close database connection when thread is done
+		connection.close()
+
+
 @api_view(['GET'])
 def checkTrigger(request):
 	"""Check if any published posts meet their trigger conditions"""
 	from django.utils import timezone
 
+	# Get campaign_id from query params (optional)
+	campaign_id = request.GET.get('campaign_id')
+
 	# Filter published posts that have triggers configured
-	publishedPosts = Post.objects.filter(
+	query = Post.objects.filter(
 		status="published",
 		trigger_condition__isnull=False,
 		trigger_value__isnull=False,
 		trigger_comparison__isnull=False
-	).select_related('metrics').order_by('created_at')
+	)
+
+	# Filter by campaign if campaign_id provided
+	if campaign_id:
+		query = query.filter(campaign__campaign_id=campaign_id)
+
+	publishedPosts = query.select_related('metrics').order_by('created_at')
 
 	triggeredPosts = []
 
@@ -146,44 +350,77 @@ def checkTrigger(request):
 		# Calculate elapsed time since posting
 		elapsed_time = (timezone.now() - post.posted_time).total_seconds()
 
-		# Get the metric value based on trigger_condition
-		metric_value = 0
-		if post.trigger_condition == 'likes':
-			metric_value = post.metrics.likes
-		elif post.trigger_condition == 'retweets':
-			metric_value = post.metrics.retweets
-		elif post.trigger_condition == 'impressions':
-			metric_value = post.metrics.impressions
-		elif post.trigger_condition == 'comments':
-			metric_value = post.metrics.comments
+		# Get metrics for both A/B variants
+		metrics_a = post.metrics.get_variant_metrics('A')
+		metrics_b = post.metrics.get_variant_metrics('B')
 
-		# Evaluate the comparison
-		is_triggered = False
+		# Get the specific metric value for both variants based on trigger_condition
+		metric_value_a = metrics_a.get(post.trigger_condition, 0)
+		metric_value_b = metrics_b.get(post.trigger_condition, 0)
+
+		# Evaluate the comparison for both variants
+		is_triggered_a = False
+		is_triggered_b = False
+
 		if post.trigger_comparison == '<':
-			is_triggered = metric_value < post.trigger_value
+			is_triggered_a = metric_value_a < post.trigger_value
+			is_triggered_b = metric_value_b < post.trigger_value
 		elif post.trigger_comparison == '=':
-			is_triggered = metric_value == post.trigger_value
+			is_triggered_a = metric_value_a == post.trigger_value
+			is_triggered_b = metric_value_b == post.trigger_value
 		elif post.trigger_comparison == '>':
-			is_triggered = metric_value > post.trigger_value
+			is_triggered_a = metric_value_a > post.trigger_value
+			is_triggered_b = metric_value_b > post.trigger_value
+
+		# Trigger if either variant meets the condition
+		is_triggered = is_triggered_a or is_triggered_b
 
 		if is_triggered:
+			# Track which variant(s) triggered
+			triggered_variants = []
+			if is_triggered_a:
+				triggered_variants.append('A')
+			if is_triggered_b:
+				triggered_variants.append('B')
+
 			triggeredPosts.append({
 				"post_pk": post.pk,
 				"post_title": post.title,
 				"trigger_condition": post.trigger_condition,
 				"trigger_value": post.trigger_value,
 				"trigger_comparison": post.trigger_comparison,
-				"current_value": metric_value,
+				"current_value_a": metric_value_a,
+				"current_value_b": metric_value_b,
+				"triggered_variants": triggered_variants,
 				"elapsed_time_seconds": elapsed_time,
 				"trigger_prompt": post.trigger_prompt
 			})
 
 	if triggeredPosts:
 		print(f"Triggered {len(triggeredPosts)} post(s):", triggeredPosts)
-		# TODO: call AI Agent here to generate new posts/strategy based on performance
-		# For each triggered post, use trigger_prompt to guide the agent
 
-	return Response({"triggered_posts": triggeredPosts, "count": len(triggeredPosts)}, status=200)
+		# Launch background threads to regenerate content for each triggered post
+		for triggered_post_data in triggeredPosts:
+			try:
+				# Launch background task (returns immediately)
+				regeneration_thread = threading.Thread(
+					target=regenerate_content_background,
+					args=(triggered_post_data,),
+					daemon=True
+				)
+				regeneration_thread.start()
+				print(f"[Trigger] Launched regeneration thread for post {triggered_post_data['post_pk']}")
+
+			except Exception as e:
+				print(f"❌ Error launching regeneration thread for post {triggered_post_data['post_pk']}: {e}")
+				# Continue processing other posts even if one fails
+				continue
+
+	return Response({
+		"triggered_posts": triggeredPosts,
+		"count": len(triggeredPosts),
+		"message": f"Triggers fired for {len(triggeredPosts)} post(s). Content regeneration started in background." if triggeredPosts else "No triggers fired."
+	}, status=200)
 
 @api_view(['GET'])
 def nodesJSON(request):
@@ -262,9 +499,9 @@ def createXPost(request):
 
 	post = Post.objects.get(pk=pk)
 
-	# Get both variants A and B
-	variant_a = ContentVariant.objects.filter(variant_id="A", post=post).first()
-	variant_b = ContentVariant.objects.filter(variant_id="B", post=post).first()
+	# Get both variants A and B (latest versions only)
+	variant_a = ContentVariant.objects.filter(variant_id="A", post=post).order_by('-created_at').first()
+	variant_b = ContentVariant.objects.filter(variant_id="B", post=post).order_by('-created_at').first()
 
 	results = {}
 	errors = []
@@ -460,8 +697,8 @@ def selectVariant(request):
 
 	try:
 		post = Post.objects.get(pk=pk)
-		# Verify the variant exists
-		variant = post.variants.filter(variant_id=variant_id).first()
+		# Verify the variant exists (get latest version)
+		variant = post.variants.filter(variant_id=variant_id).order_by('-created_at').first()
 
 		if not variant:
 			return Response({"error": f"Variant '{variant_id}' not found for post {pk}"}, status=404)
@@ -560,9 +797,9 @@ def approveAllNodes(request):
 		# Approve each draft post and create X post for BOTH variants
 		for post in draft_posts:
 			try:
-				# Get both variants A and B
-				variant_a = ContentVariant.objects.filter(variant_id="A", post=post).first()
-				variant_b = ContentVariant.objects.filter(variant_id="B", post=post).first()
+				# Get both variants A and B (latest versions only)
+				variant_a = ContentVariant.objects.filter(variant_id="A", post=post).order_by('-created_at').first()
+				variant_b = ContentVariant.objects.filter(variant_id="B", post=post).order_by('-created_at').first()
 
 				results = {}
 				post_errors = []

@@ -174,6 +174,93 @@ Use the analyzed report to understand what worked and what didn't, then create b
         output = self._extract_output(result)
         return output
 
+    def regenerate_content(self, post, analysis_report: MetricsAnalysis) -> ContentOutput:
+        """
+        Regenerate improved A/B content variants for a post based on trigger analysis.
+
+        This method:
+        1. Fetches existing variants from database
+        2. Calls execute_with_metrics() with analysis insights
+        3. Creates NEW ContentVariant records (keeps old variants for history)
+        4. Updates post title and description if needed
+        5. Sets post.status = "draft"
+        6. Clears trigger configuration
+
+        Args:
+            post: Post Django model instance
+            analysis_report: MetricsAnalysis from metrics_analyzer.execute_trigger_analysis()
+
+        Returns:
+            ContentOutput with regenerated A and B variants
+
+        Example:
+            >>> from agents.models import Post
+            >>> from agents.content_creator import create_content_creator
+            >>> from agents.metrics_analyzer import create_metrics_analyzer
+            >>>
+            >>> post = Post.objects.get(pk=1)
+            >>> metrics_agent = create_metrics_analyzer()
+            >>> analysis = metrics_agent.execute_trigger_analysis(...)
+            >>>
+            >>> content_agent = create_content_creator()
+            >>> new_content = content_agent.regenerate_content(post, analysis)
+        """
+        # Import here to avoid circular imports
+        from .models import ContentVariant
+
+        # Get existing variants
+        existing_variants = post.variants.all().order_by('created_at')
+
+        # Build old content string from existing variants
+        old_content_parts = []
+        for variant in existing_variants:
+            old_content_parts.append(f"Variant {variant.variant_id}: {variant.content}")
+        old_content = "\n".join(old_content_parts)
+
+        # Get campaign and product info
+        campaign = post.campaign
+        product_info = campaign.metadata.get('product_info', '') if campaign.metadata else ''
+
+        # Generate improved content using execute_with_metrics
+        new_content = self.execute_with_metrics(
+            title=post.title,
+            description=post.description,
+            product_info=product_info,
+            old_content=old_content,
+            analyzed_report=analysis_report.analysis
+        )
+
+        # Create NEW ContentVariant records (keep old ones for history)
+        ContentVariant.objects.create(
+            post=post,
+            variant_id='A',
+            content=new_content.A,
+            platform='X',
+            metadata={'image_caption': new_content.A_image_caption, 'regenerated': True}
+        )
+
+        ContentVariant.objects.create(
+            post=post,
+            variant_id='B',
+            content=new_content.B,
+            platform='X',
+            metadata={'image_caption': new_content.B_image_caption, 'regenerated': True}
+        )
+
+        # Update post status to draft for user review
+        post.status = 'draft'
+
+        # Clear trigger configuration to prevent re-triggering
+        post.trigger_condition = None
+        post.trigger_value = None
+        post.trigger_comparison = None
+        post.trigger_prompt = None
+
+        # Save post
+        post.save()
+
+        return new_content
+
     def _extract_output(self, result: Dict[str, Any]) -> ContentOutput:
         """
         Extract ContentOutput from agent result.

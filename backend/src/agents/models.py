@@ -184,10 +184,10 @@ class ContentVariant(models.Model):
 	created_at = models.DateTimeField(auto_now_add=True)
 
 	class Meta:
-		ordering = ['variant_id']
-		unique_together = [['post', 'variant_id']]
+		ordering = ['-created_at', 'variant_id']  # Newest first, then by variant_id
+		# Removed unique_together to allow multiple generations of same variant_id
 		indexes = [
-			models.Index(fields=['post', 'variant_id']),
+			models.Index(fields=['post', 'variant_id', '-created_at']),
 		]
 
 	def __str__(self):

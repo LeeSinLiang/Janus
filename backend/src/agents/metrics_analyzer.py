@@ -215,6 +215,100 @@ Provide a comprehensive analysis with insights and specific recommendations."""
 		# Return as MetricsAnalysis object
 		return MetricsAnalysis.model_validate(result['structured_response'])
 
+	def execute_trigger_analysis(
+		self,
+		metrics_data: Dict[str, Any],
+		condition: str,
+		trigger_value: int,
+		comparison: str,
+		trigger_prompt: str,
+		triggered_variants: List[str]
+	) -> MetricsAnalysis:
+		"""
+		Analyze metrics when a trigger condition is met, providing targeted insights
+		for content regeneration.
+
+		Args:
+			metrics_data: Dictionary containing X API metrics for both A/B variants
+			condition: The metric condition that triggered (e.g., 'likes', 'retweets')
+			trigger_value: The threshold value for the trigger
+			comparison: The comparison operator ('<', '=', '>')
+			trigger_prompt: User's prompt for what to do when trigger fires
+			triggered_variants: List of variants that met the condition (["A"], ["B"], or ["A", "B"])
+
+		Returns:
+			MetricsAnalysis object with insights focused on why trigger fired
+			and how to improve content
+
+		Example:
+			>>> agent = create_metrics_analyzer()
+			>>> result = agent.execute_trigger_analysis(
+			...     metrics_data={"variant_a_likes": 3, "variant_b_likes": 8},
+			...     condition="likes",
+			...     trigger_value=5,
+			...     comparison="<",
+			...     trigger_prompt="generate new strategy focused on emotional engagement",
+			...     triggered_variants=["A"]
+			... )
+		"""
+		# Convert metrics_data to formatted JSON string
+		metrics_json = json.dumps(metrics_data, indent=2)
+
+		# Build comparison symbol display
+		comparison_symbols = {'<': 'less than', '=': 'equal to', '>': 'greater than'}
+		comparison_text = comparison_symbols.get(comparison, comparison)
+
+		# Build triggered variants text
+		variants_text = " and ".join(triggered_variants)
+
+		# Build the specialized input for trigger analysis
+		trigger_input = f"""⚠️ TRIGGER ALERT: Performance threshold has been crossed.
+
+**TRIGGER DETAILS:**
+- Condition: {condition} {comparison_text} {trigger_value}
+- Triggered Variants: {variants_text}
+- User's Action Prompt: "{trigger_prompt}"
+
+**METRICS DATA:**
+```json
+{metrics_json}
+```
+
+**YOUR TASK:**
+You MUST analyze WHY this trigger fired and provide actionable insights for content regeneration.
+
+1. **Root Cause Analysis**: Why did variant(s) {variants_text} fail to reach {trigger_value} {condition}?
+   - Was the messaging weak?
+   - Was the hook ineffective?
+   - Was the timing wrong?
+   - Was the format suboptimal?
+
+2. **A/B Comparison**: Compare the performance of both variants:
+   - Which variant performed better overall?
+   - What specific elements drove better performance?
+   - What can we learn from the differences?
+
+3. **Content Regeneration Strategy**: Based on the user's prompt "{trigger_prompt}", provide:
+   - Specific improvements to messaging/tone
+   - Hook/opening suggestions
+   - Content format recommendations
+   - Hashtag and emoji strategy
+   - Call-to-action improvements
+
+4. **Prioritized Recommendations**: What should the content creator focus on when regenerating?
+   - Quick wins (immediate impact)
+   - Strategic changes (long-term improvement)
+
+Focus on ACTIONABLE insights that will help generate better performing content."""
+
+		# Generate analysis
+		result = self.agent.invoke({
+			"messages": [{"role": "user", "content": trigger_input}]
+		})
+
+		# Return as MetricsAnalysis object
+		return MetricsAnalysis.model_validate(result['structured_response'])
+
 
 # =====================
 # Convenience Functions
