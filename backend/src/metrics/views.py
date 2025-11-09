@@ -76,6 +76,8 @@ def checkTrigger(request):
 		print("Triggered posts:", triggeredPosts)
 		# callSinAgentAPI(triggeredPosts)
 
+	return Response({"triggered_posts": triggeredPosts}, status=200)
+
 @api_view(['GET'])
 def nodesJSON(request):
 	# Get campaign_id from query params, fallback to first campaign
