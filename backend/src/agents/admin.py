@@ -58,7 +58,7 @@ class PostAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Post Information', {
-            'fields': ('title', 'description', 'next_posts', 'post_id', 'campaign', 'phase', 'status', 'selected_variant')
+            'fields': ('title', 'description', 'next_posts', 'post_id', 'campaign', 'phase', 'status', 'selected_variant', 'trigger')
         }),
         ('Metrics', {
             'fields': ('metrics',),

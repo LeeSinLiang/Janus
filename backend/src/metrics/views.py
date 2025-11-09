@@ -3,6 +3,7 @@ import os, requests, time
 from dotenv import load_dotenv
 from django.conf import settings
 from .models import PostMetrics
+from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from twitter_clone.models import CloneComment
@@ -26,6 +27,25 @@ def getMetricsDB():
 			"retweets": m.retweets if m else 0,
 		}
 	return out
+
+@api_view(['POST'])
+def setTrigger(request):
+	pk = request.data.get("pk")
+	trigger = request.data.get("trigger")
+	if not pk:
+		return Response({"error": "Missing 'pk' field"}, status=400)
+	if not trigger:
+		return Response({"error": "Missing 'trigger' field"}, status=400)
+
+	try:
+		post = Post.objects.get(pk=pk)
+	except Post.DoesNotExist:
+		return Response({"error": f"Post {pk} not found"}, status=status.HTTP_404_NOT_FOUND)
+	
+	post.trigger = trigger
+	post.save()
+
+	return Response({"success": True, "post_id": post.pk, "trigger": post.trigger}, status=status.HTTP_200_OK)
 
 ###### FOR AI AGENT TO DETERMINE NEW DIRECTION/STRATEGY ######
 def getMetricsAI(pk):
@@ -104,7 +124,7 @@ def createXPost(request):
 			post.save()
 
 	return Response(resp.json(), status=resp.status_code)
-	
+
 @api_view(['POST'])
 def getXPostMetrics(request):
 	pk = request.data.get("pk")
