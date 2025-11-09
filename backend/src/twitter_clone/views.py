@@ -27,7 +27,7 @@ def create_tweet(request):
     Returns: {"data": {"id": "...", "text": "..."}}
     """
     text = request.data.get('text', '')
-    media = request.data.get('media').strip()
+    media = request.data.get('media')
 
     user, _ = User.objects.get_or_create(id=1, defaults={'username': 'default_user'})
     tweet = CloneTweet.objects.create(text=text, author=user)

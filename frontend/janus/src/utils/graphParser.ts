@@ -87,8 +87,12 @@ function createReactFlowNode(
   const icon = DEFAULT_ICONS[index % DEFAULT_ICONS.length];
   const iconBg = DEFAULT_COLORS[index % DEFAULT_COLORS.length];
 
-  // Default tags (can be extended based on node attributes in the future)
-  const tags = [ATTRIBUTES.FEATURE, ATTRIBUTES.PLANNED];
+  // Determine tags based on post status
+  const statusTag = diagramNode.status === 'published'
+    ? { label: 'Published', color: '#10B981' }  // Green for published
+    : ATTRIBUTES.PLANNED;  // Yellow for draft/planned
+
+  const tags = [statusTag];
 
   // Get metrics for this node if available
   const metrics = metricsMap[diagramNode.pk];

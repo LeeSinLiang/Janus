@@ -95,19 +95,37 @@ export function diffGraphData(
 }
 
 /**
- * Check if node data has changed (title, description, or metrics)
+ * Check if node data has changed (title, description, metrics, or tags)
  */
 function hasNodeDataChanged(oldNode: Node, newNode: Node): boolean {
   const oldData = oldNode.data;
   const newData = newNode.data;
+
+  // Compare tags array
+  const tagsChanged = !areTagsEqual(oldData?.tags, newData?.tags);
 
   // Compare relevant fields
   return (
     oldData?.title !== newData?.title ||
     oldData?.description !== newData?.description ||
     oldData?.likes !== newData?.likes ||
-    oldData?.comments !== newData?.comments
+    oldData?.comments !== newData?.comments ||
+    tagsChanged
   );
+}
+
+/**
+ * Compare two tags arrays for equality
+ */
+function areTagsEqual(oldTags: any[] | undefined, newTags: any[] | undefined): boolean {
+  if (!oldTags && !newTags) return true;
+  if (!oldTags || !newTags) return false;
+  if (oldTags.length !== newTags.length) return false;
+
+  return oldTags.every((oldTag, index) => {
+    const newTag = newTags[index];
+    return oldTag?.label === newTag?.label && oldTag?.color === newTag?.color;
+  });
 }
 
 /**
