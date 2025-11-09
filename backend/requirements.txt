@@ -5,20 +5,13 @@ Django>=5.2.8
 Flask>=3.0.0
 
 # LangChain Core (verified from docs.langchain.com)
-langchain>=0.3.0
-langchain-core>=0.3.0
-
-# LangChain Google Genai
-langchain-google-genai>=2.0.0
-
-# LangGraph (for agents)
-langgraph>=0.2.0
-
-# Google Generative AI
-google-generativeai>=0.8.0
+langchain
+langchain-core
+langchain-google-genai
+google-genai
 
 # Data Validation & Serialization
-pydantic>=2.0.0
+pydantic<2
 pydantic-settings>=2.0.0
 
 # Utilities
