@@ -11,6 +11,7 @@ Usage:
 
 import requests
 import json
+import time
 
 # API Configuration
 BASE_URL = "http://localhost:8000"
@@ -161,12 +162,115 @@ def test_campaign_detail(campaign_id):
                 print(f"\n  {phase}: {len(phase_groups[phase])} posts")
                 for post in phase_groups[phase][:3]:
                     print(f"    - {post['post_id']}: {post['title'][:50]}")
+
+            return campaign
         else:
             print("\n❌ Error!")
             print(json.dumps(response.json(), indent=2))
+            return None
 
     except Exception as e:
         print(f"\n❌ Error: {str(e)}")
+        return None
+
+
+def monitor_campaign_phase_transitions(campaign_id, max_wait=120, check_interval=5):
+    """
+    Monitor campaign phase transitions to verify background content generation.
+
+    Expected flow:
+    1. planning → content_creation (when background task starts)
+    2. content_creation → scheduled (when content generation completes)
+
+    Args:
+        campaign_id: ID of campaign to monitor
+        max_wait: Maximum time to wait in seconds (default: 120)
+        check_interval: How often to check in seconds (default: 5)
+    """
+    print("\n" + "=" * 80)
+    print("Monitoring Campaign Phase Transitions")
+    print("=" * 80)
+
+    print(f"\nCampaign ID: {campaign_id}")
+    print(f"Monitoring for up to {max_wait} seconds...")
+    print(f"Checking every {check_interval} seconds...\n")
+
+    url = f"{CAMPAIGNS_API_URL}{campaign_id}/"
+    phases_seen = []
+    variants_count = 0
+    start_time = time.time()
+
+    try:
+        while time.time() - start_time < max_wait:
+            # Get campaign details
+            response = requests.get(url)
+
+            if response.status_code == 200:
+                data = response.json()
+                campaign = data.get('campaign', {})
+                posts = data.get('posts', [])
+
+                current_phase = campaign['phase']
+
+                # Track phase changes
+                if not phases_seen or current_phase != phases_seen[-1]:
+                    if phases_seen:
+                        print(f"✓ Phase transition: {phases_seen[-1]} → {current_phase}")
+                    else:
+                        print(f"Initial phase: {current_phase}")
+                    phases_seen.append(current_phase)
+
+                # Count variants across all posts
+                new_variants_count = 0
+                for post in posts:
+                    new_variants_count += len(post.get('variants', []))
+
+                # Track variant generation
+                if new_variants_count > variants_count:
+                    print(f"✓ Variants generated: {variants_count} → {new_variants_count}")
+                    variants_count = new_variants_count
+
+                # Check if we reached scheduled phase
+                if current_phase == 'scheduled':
+                    print(f"\n✅ Campaign reached 'scheduled' phase!")
+                    break
+
+                time.sleep(check_interval)
+            else:
+                print(f"⚠️  Error fetching campaign: {response.status_code}")
+                break
+
+        # Final summary
+        print("\n" + "="*80)
+        print("MONITORING SUMMARY")
+        print("="*80)
+        print(f"Phase transitions: {' → '.join(phases_seen)}")
+        print(f"Total variants generated: {variants_count}")
+
+        # Verify expected behavior
+        expected_phases = ['planning', 'content_creation', 'scheduled']
+
+        print("\n✅ Verification:")
+        if 'content_creation' in phases_seen:
+            print("  ✓ Campaign entered 'content_creation' phase")
+        else:
+            print("  ⚠️  Campaign did not enter 'content_creation' phase")
+
+        if 'scheduled' in phases_seen:
+            print("  ✓ Campaign reached 'scheduled' phase")
+        else:
+            print("  ⚠️  Campaign has not reached 'scheduled' phase yet")
+
+        if variants_count > 0:
+            print(f"  ✓ Content variants were generated ({variants_count} total)")
+        else:
+            print("  ⚠️  No content variants generated yet")
+
+        return phases_seen
+
+    except Exception as e:
+        print(f"\n❌ Error during monitoring: {str(e)}")
+        return phases_seen
 
 
 def main():
@@ -175,6 +279,7 @@ def main():
 ╔════════════════════════════════════════════════════════════════════════════╗
 ║                                                                            ║
 ║         🚀 JANUS - Strategy Planning API Test                             ║
+║         With Automatic Background Content Generation                      ║
 ║                                                                            ║
 ╚════════════════════════════════════════════════════════════════════════════╝
     """)
@@ -182,10 +287,27 @@ def main():
     # Test 1: Create a strategy
     result = test_strategy_planning()
 
-    # Test 2: List campaigns
+    # Test 2: Monitor phase transitions (NEW - tests automatic content generation)
+    if result and result.get('campaign_id'):
+        campaign_id = result['campaign_id']
+
+        print("\n" + "=" * 80)
+        print("ℹ️  Background content generation has been triggered automatically!")
+        print("   The campaign will transition through the following phases:")
+        print("   1. planning → content_creation")
+        print("   2. content_creation → scheduled")
+        print("=" * 80)
+
+        # Wait a moment for background task to start
+        time.sleep(2)
+
+        # Monitor campaign phase transitions
+        monitor_campaign_phase_transitions(campaign_id, max_wait=180, check_interval=5)
+
+    # Test 3: List campaigns
     test_list_campaigns()
 
-    # Test 3: Get campaign detail (if we created one)
+    # Test 4: Get campaign detail (if we created one)
     if result and result.get('campaign_id'):
         test_campaign_detail(result['campaign_id'])
 

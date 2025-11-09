@@ -10,7 +10,9 @@ urlpatterns = [
     path('createXPost/', views.createXPost, name='createXPost'),
     path('getXPostMetrics/', views.getXPostMetrics, name='getXPostMetrics'),
     path('api/approve', views.approveNode, name='approveNode'),
+    path('api/approveAll', views.approveAllNodes, name='approveAllNodes'),
     path('api/graph', views.rejectNode, name='rejectNode'),
+
     path('setTrigger/', views.setTrigger, name='setTrigger'),
     path('checkTrigger/', views.checkTrigger, name='checkTrigger'),
 ]

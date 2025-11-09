@@ -2,10 +2,15 @@
 API Views for Agents
 """
 
+import base64
+import threading
+import time
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.db import transaction
+from django.db import transaction, connection
+from django.db.utils import OperationalError
+from django.core.files.base import ContentFile
 
 from .serializers import (
 	StrategyPlanningRequestSerializer,
@@ -14,8 +19,196 @@ from .serializers import (
 	PostSerializer
 )
 from .strategy_planner import create_strategy_planner
+from .content_creator import create_content_creator
+from .media_creator import create_media_creator
 from .mermaid_parser import parse_mermaid_diagram
-from .models import Campaign, Post
+from .models import Campaign, Post, ContentVariant
+
+
+def retry_on_db_lock(func, max_retries=5, initial_delay=0.1):
+	"""
+	Retry a database operation with exponential backoff if it fails due to database lock.
+
+	Args:
+		func: Function to retry
+		max_retries: Maximum number of retry attempts
+		initial_delay: Initial delay in seconds (will be doubled after each retry)
+
+	Returns:
+		The result of the function call
+
+	Raises:
+		OperationalError: If all retries fail
+	"""
+	delay = initial_delay
+	last_exception = None
+
+	for attempt in range(max_retries):
+		try:
+			return func()
+		except OperationalError as e:
+			last_exception = e
+			if "database is locked" in str(e).lower():
+				if attempt < max_retries - 1:
+					print(f"Database locked, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
+					time.sleep(delay)
+					delay *= 2  # Exponential backoff
+				else:
+					print(f"Database locked after {max_retries} attempts, giving up")
+					raise
+			else:
+				# Not a lock error, re-raise immediately
+				raise
+
+	# Should not reach here, but just in case
+	if last_exception:
+		raise last_exception
+
+
+def generate_ab_content_background(campaign_id: str, product_description: str):
+	"""
+	Background task to generate A/B content for all posts in a campaign.
+
+	This function:
+	1. Sets campaign phase to "content_creation"
+	2. Generates A/B content variants for all posts
+	3. Generates media assets for each variant
+	4. Sets campaign phase to "scheduled" when complete
+
+	Args:
+		campaign_id: ID of the campaign to generate content for
+		product_description: Product description for content generation context
+	"""
+	# IMPORTANT: Close any existing database connections
+	# Threads need to manage their own database connections
+	connection.close()
+
+	try:
+		# Step 1: Get campaign and set phase to content_creation
+		def update_campaign_phase_to_creation():
+			with transaction.atomic():
+				campaign = Campaign.objects.select_for_update().get(campaign_id=campaign_id)
+				campaign.phase = 'content_creation'
+				campaign.save(update_fields=['phase', 'updated_at'])
+				return campaign
+
+		campaign = retry_on_db_lock(update_campaign_phase_to_creation)
+
+		# Step 2: Initialize agents (outside of database transactions)
+		content_agent = create_content_creator()
+		media_agent = create_media_creator(model_name='models/gemini-2.5-flash-image')
+
+		# Step 3: Get all posts from campaign
+		def get_posts():
+			return list(Campaign.objects.get(campaign_id=campaign_id).posts.all().order_by('phase', 'post_id'))
+
+		posts = retry_on_db_lock(get_posts)
+
+		# Step 4: Generate A/B content for each post
+		for post in posts:
+			try:
+				# Generate A/B content (outside of database transaction)
+				content_output = content_agent.execute(
+					title=post.title,
+					description=post.description,
+					product_info=product_description
+				)
+
+				# Create ContentVariant A with retry logic
+				def create_variant_a():
+					with transaction.atomic():
+						return ContentVariant.objects.create(
+							post=post,
+							variant_id='A',
+							content=content_output.A,
+							platform='X',
+							metadata={'image_caption': content_output.A_image_caption}
+						)
+
+				variant_a = retry_on_db_lock(create_variant_a)
+
+				# Generate and save media for Variant A
+				try:
+					asset_a = media_agent.create_image(prompt=content_output.A_image_caption)
+					mime_type = asset_a['mime_type']
+					ext = mime_type.split('/')[-1]
+					data = ContentFile(base64.b64decode(asset_a['data']))
+
+					# Save asset with retry logic
+					def save_variant_a_asset():
+						variant_a.asset.save(f'variant_a_image.{ext}', data, save=True)
+
+					retry_on_db_lock(save_variant_a_asset)
+				except Exception as e:
+					print(f"Warning: Failed to generate image for variant A of post {post.post_id}: {e}")
+
+				# Create ContentVariant B with retry logic
+				def create_variant_b():
+					with transaction.atomic():
+						return ContentVariant.objects.create(
+							post=post,
+							variant_id='B',
+							content=content_output.B,
+							platform='X',
+							metadata={'image_caption': content_output.B_image_caption}
+						)
+
+				variant_b = retry_on_db_lock(create_variant_b)
+
+				# Generate and save media for Variant B
+				try:
+					asset_b = media_agent.create_image(prompt=content_output.B_image_caption)
+					mime_type = asset_b['mime_type']
+					ext = mime_type.split('/')[-1]
+					data = ContentFile(base64.b64decode(asset_b['data']))
+
+					# Save asset with retry logic
+					def save_variant_b_asset():
+						variant_b.asset.save(f'variant_b_image.{ext}', data, save=True)
+
+					retry_on_db_lock(save_variant_b_asset)
+				except Exception as e:
+					print(f"Warning: Failed to generate image for variant B of post {post.post_id}: {e}")
+
+			except Exception as e:
+				print(f"Error generating variants for post {post.post_id}: {e}")
+				# Continue with next post even if one fails
+				continue
+
+		# Step 5: Set campaign phase to scheduled
+		def update_campaign_phase_to_scheduled():
+			with transaction.atomic():
+				campaign = Campaign.objects.select_for_update().get(campaign_id=campaign_id)
+				campaign.phase = 'scheduled'
+				campaign.save(update_fields=['phase', 'updated_at'])
+
+		retry_on_db_lock(update_campaign_phase_to_scheduled)
+
+		print(f"Content generation complete for campaign {campaign_id}")
+
+	except Exception as e:
+		print(f"Error in background content generation for campaign {campaign_id}: {e}")
+		import traceback
+		traceback.print_exc()
+
+		# Set campaign phase to planning if error occurs
+		def rollback_campaign_phase():
+			try:
+				with transaction.atomic():
+					campaign = Campaign.objects.select_for_update().get(campaign_id=campaign_id)
+					campaign.phase = 'planning'
+					campaign.save(update_fields=['phase', 'updated_at'])
+			except Exception as rollback_error:
+				print(f"Failed to rollback campaign phase: {rollback_error}")
+
+		try:
+			retry_on_db_lock(rollback_campaign_phase)
+		except:
+			pass
+
+	finally:
+		# Close database connection when thread is done
+		connection.close()
 
 
 class StrategyPlanningAPIView(APIView):
@@ -136,6 +329,18 @@ class StrategyPlanningAPIView(APIView):
 					f" and saved as campaign {campaign_id}"
 				)
 			}
+
+			# Step 5: Trigger background content generation (Scenario 2)
+			# This will:
+			# 1. Set campaign phase to "content_creation"
+			# 2. Generate A/B content for all posts
+			# 3. Set campaign phase to "scheduled" when complete
+			content_thread = threading.Thread(
+				target=generate_ab_content_background,
+				args=(campaign_id, product_description),
+				daemon=True
+			)
+			content_thread.start()
 
 			return Response(
 				response_data,

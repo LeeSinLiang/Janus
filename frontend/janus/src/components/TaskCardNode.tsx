@@ -92,14 +92,10 @@ export default function TaskCardNode({ data, id }: TaskCardNodeProps) {
 
       <div
         onClick={(e) => {
-          // Don't trigger onClick if clicking approve/reject buttons
-          if (isPending) return;
           e.stopPropagation();
           data.onClick?.();
         }}
-        className={`w-[300px] rounded-lg p-4 shadow-md transition-all ${
-          !isPending ? 'cursor-pointer hover:shadow-lg' : ''
-        }`}
+        className={`w-[300px] rounded-lg p-4 shadow-md transition-all cursor-pointer hover:shadow-lg`}
         style={
           isPending
             ? {

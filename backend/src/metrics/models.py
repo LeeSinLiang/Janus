@@ -7,7 +7,7 @@ class PostMetrics(models.Model):
     impressions = models.IntegerField(default=0)
     comments = models.IntegerField(default=0)
     commentList = models.JSONField(default=list)
-    tweet_id = models.CharField(max_length=50)
+    tweet_id = models.CharField(max_length=50, blank=True, default="")
 
     def __str__(self):
         post = self.post_set.first()
