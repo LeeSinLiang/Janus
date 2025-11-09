@@ -223,6 +223,7 @@ export async function generateStrategy(params: {
   product_description: string;
   gtm_goals: string;
   campaign_name: string;
+  enable_video?: boolean;
 }): Promise<any> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/agents/strategy/`, {

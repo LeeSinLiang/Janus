@@ -25,6 +25,11 @@ class StrategyPlanningRequestSerializer(serializers.Serializer):
         default=True,
         help_text="Whether to save the strategy to database (default: true)"
     )
+    enable_video = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="Enable video generation for first post variant (default: false)"
+    )
 
 
 class PostNodeSerializer(serializers.Serializer):
