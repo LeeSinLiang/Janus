@@ -380,6 +380,60 @@ CORS_ALLOWED_ORIGINS = [
 4. Update serializers if REST API affected (see `agents/serializers.py` or `metrics/serializers.py`)
 5. Register new models in admin interface (see `agents/admin.py` or `metrics/admin.py`)
 
+### Regenerating Campaign Strategy from Specific Phase
+
+**New Feature:** Use the `!regenerate phase X` chat command to regenerate strategy from a specific phase onwards while preserving earlier phases.
+
+**Chat Command:**
+```
+!regenerate phase 2 focus on technical demos and developer engagement
+```
+
+**How it works:**
+1. Specify which phase to regenerate from (e.g., phase 2)
+2. Provide new direction/prompt for the regenerated strategy
+3. System archives posts from phase 2 onwards (sets `is_active=False`)
+4. Strategy planner generates new phases with many-to-many connections
+5. New posts are created and linked to existing phase 1 posts
+6. Content generation runs automatically for new posts only
+
+**Key Features:**
+- **Preserves Earlier Phases**: Phase 1 posts remain unchanged with their connections intact
+- **Many-to-Many Connections**: Supports branching (1→N) and merging (N→1) between old and new posts
+- **Version Tracking**: Campaign tracks `current_version`, posts track `version` and `is_active` status
+- **Smart Linking**: Strategy planner determines connections based on content relevance
+- **Dynamic Node Count**: Generates 2-5 nodes per phase (not fixed at 3)
+
+**Example Workflow:**
+```bash
+# In ChatBox on canvas page:
+!regenerate phase 2 pivot to developer-first strategy with technical demos
+
+# System will:
+# 1. Keep Phase 1 posts active
+# 2. Archive old Phase 2 & 3 posts (is_active=False)
+# 3. Generate new Phase 2 & 3 posts
+# 4. Connect Phase 1 posts to new Phase 2 posts
+# 5. Generate A/B content for new posts
+```
+
+**API Endpoint:**
+```bash
+POST /api/agents/regenerate-strategy/
+{
+  "campaign_id": "campaign_1",
+  "phase_num": 2,
+  "new_direction": "Focus on ProductHunt launch with developer communities"
+}
+```
+
+**Database Changes:**
+- `Campaign.current_version` (IntegerField) - tracks strategy version
+- `Post.version` (IntegerField) - tracks which version this post belongs to
+- `Post.is_active` (BooleanField) - filters archived posts from display
+
+**Note:** Archived posts are kept in the database for future versioning UI but hidden from display.
+
 ### Debugging Common Issues
 
 **Backend:**

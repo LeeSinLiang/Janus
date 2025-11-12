@@ -456,6 +456,40 @@ export async function sendMultiNodePrompt(nodes: number[], prompt: string): Prom
 }
 
 /**
+ * Regenerate strategy for a specific phase - sends POST request with campaign ID, phase number, and new direction
+ * Triggers background regeneration of strategy for the specified phase
+ */
+export async function regenerateStrategy(
+  campaignId: string,
+  phaseNum: number,
+  newDirection: string
+): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/agents/regenerate-strategy/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        campaign_id: campaignId,
+        phase_num: phaseNum,
+        new_direction: newDirection
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to regenerate strategy: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error regenerating strategy:', error);
+    throw error;
+  }
+}
+
+/**
  * Mock function for development/testing
  * Remove this when connecting to real backend
  */

@@ -7,7 +7,8 @@ from .views import (
     StrategyPlanningAPIView,
     CampaignListAPIView,
     CampaignDetailAPIView,
-    GenerateNewPostAPIView
+    GenerateNewPostAPIView,
+    RegenerateStrategyAPIView
 )
 
 app_name = 'agents'
@@ -22,4 +23,7 @@ urlpatterns = [
 
     # New Post Generation API
     path('generate-new-post/', GenerateNewPostAPIView.as_view(), name='generate-new-post'),
+
+    # Strategy Regeneration API
+    path('regenerate-strategy/', RegenerateStrategyAPIView.as_view(), name='regenerate-strategy'),
 ]

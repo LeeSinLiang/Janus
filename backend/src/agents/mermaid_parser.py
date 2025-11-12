@@ -66,7 +66,10 @@ def parse_mermaid_diagram(mermaid_string: str) -> Dict[str, List[Dict[str, str]]
             # Check for subgraph to identify phase
             subgraph_match = re.search(r'subgraph\s+"([^"]+)"', line)
             if subgraph_match:
-                current_phase = subgraph_match.group(1)
+                phase_name = subgraph_match.group(1)
+                # Normalize phase name by removing "(Existing)" or "(New)" labels
+                # e.g., "Phase 1 (Existing)" -> "Phase 1"
+                current_phase = re.sub(r'\s*\((Existing|New)\)\s*$', '', phase_name)
                 continue
 
             # Check for end of subgraph

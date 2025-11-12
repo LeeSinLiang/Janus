@@ -29,6 +29,9 @@ class Campaign(models.Model):
 	metadata = models.JSONField(default=dict, blank=True)
 	insights = models.JSONField(default=list, blank=True)
 
+	# Versioning support for campaign regeneration
+	current_version = models.IntegerField(default=1, help_text="Current version number for strategy regeneration")
+
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
@@ -131,6 +134,10 @@ class Post(models.Model):
 		help_text="Time when post was published to X/Twitter"
 	)
 
+	# Versioning support for strategy regeneration
+	version = models.IntegerField(default=1, help_text="Version number of this post")
+	is_active = models.BooleanField(default=True, db_index=True, help_text="Whether this post is currently active (False for archived versions)")
+
 	# Many-to-many relationship to track post dependencies
 	next_posts = models.ManyToManyField(
 		'self',
@@ -147,6 +154,7 @@ class Post(models.Model):
 		indexes = [
 			models.Index(fields=['post_id']),
 			models.Index(fields=['campaign', 'status']),
+			models.Index(fields=['campaign', 'is_active']),
 			models.Index(fields=['-created_at']),
 		]
 

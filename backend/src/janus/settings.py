@@ -215,3 +215,76 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+# Logging configuration - Make backend logs more debug-friendly
+# Filters out noisy polling requests from frontend
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'skip_polling_endpoints': {
+            '()': 'django.utils.log.CallbackFilter',
+            'callback': lambda record: not any([
+                '/nodesJson/' in record.getMessage(),
+                '/getVariants/' in record.getMessage(),
+                '/checkTrigger/' in record.getMessage(),
+                'GET /nodesJson/' in record.getMessage(),
+                'GET /getVariants/' in record.getMessage(),
+                'GET /checkTrigger/' in record.getMessage(),
+            ])
+        },
+    },
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {module} - {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'simple': {
+            'format': '[{levelname}] {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'filters': ['skip_polling_endpoints'],
+        },
+        'console_unfiltered': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'WARNING',  # Only show warnings/errors
+            'propagate': False,
+        },
+        'agents': {
+            'handlers': ['console_unfiltered'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'metrics': {
+            'handlers': ['console_unfiltered'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}

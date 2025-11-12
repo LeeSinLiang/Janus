@@ -99,9 +99,9 @@ def generate_ab_content_background(campaign_id: str, product_description: str, e
 
 		campaign = retry_on_db_lock(update_campaign_phase_to_creation)
 
-		# Step 2: Get all posts from campaign
+		# Step 2: Get all active posts from campaign (skip archived)
 		def get_posts():
-			return list(Campaign.objects.get(campaign_id=campaign_id).posts.all().order_by('phase', 'post_id'))
+			return list(Campaign.objects.get(campaign_id=campaign_id).posts.filter(is_active=True).order_by('phase', 'post_id'))
 
 		posts = retry_on_db_lock(get_posts)
 
@@ -310,7 +310,7 @@ def generate_new_post_background(selected_post_pks: list, user_prompt: str):
 		# Step 1: Get selected posts with retry
 		def get_selected_posts():
 			return list(
-				Post.objects.filter(pk__in=selected_post_pks)
+				Post.objects.filter(pk__in=selected_post_pks, is_active=True)
 				.select_related('campaign')
 				.prefetch_related('variants')
 				.order_by('phase', 'post_id')
@@ -692,7 +692,7 @@ class GenerateNewPostAPIView(APIView):
 
 		# Validate that nodes exist
 		try:
-			existing_posts = Post.objects.filter(pk__in=nodes)
+			existing_posts = Post.objects.filter(pk__in=nodes, is_active=True)
 			if existing_posts.count() != len(nodes):
 				return Response(
 					{
@@ -733,6 +733,336 @@ class GenerateNewPostAPIView(APIView):
 				{
 					"success": False,
 					"message": f"Error starting new post generation: {str(e)}",
+					"error": str(e)
+				},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR
+			)
+
+
+def regenerate_content_background(campaign_id: str, post_ids: list, product_description: str):
+	"""
+	Background task to generate A/B content for regenerated posts.
+
+	Args:
+		campaign_id: ID of the campaign
+		post_ids: List of Post primary keys to generate content for
+		product_description: Product description for content context
+	"""
+	# Close any existing database connections
+	connection.close()
+
+	try:
+		# Get posts
+		def get_posts():
+			return list(
+				Post.objects.filter(id__in=post_ids, is_active=True)
+				.order_by('phase', 'post_id')
+			)
+
+		posts = retry_on_db_lock(get_posts)
+
+		# Generate A/B content for each post
+		for post in posts:
+			# Initialize agents
+			content_agent = create_content_creator()
+			media_agent = create_media_creator(model_name='models/gemini-2.5-flash-image')
+
+			try:
+				# Generate A/B content
+				content_output = content_agent.execute(
+					title=post.title,
+					description=post.description,
+					product_info=product_description
+				)
+
+				# Create and save variants
+				for variant_id, content, caption_field in [
+					('A', content_output.A, content_output.A_image_caption),
+					('B', content_output.B, content_output.B_image_caption)
+				]:
+					# Create variant
+					def create_variant():
+						with transaction.atomic():
+							return ContentVariant.objects.create(
+								post=post,
+								variant_id=variant_id,
+								content=content,
+								platform='X',
+								metadata={'image_caption': caption_field}
+							)
+
+					variant = retry_on_db_lock(create_variant)
+
+					# Generate and save image
+					try:
+						asset = media_agent.create_image(prompt=caption_field)
+						mime_type = asset['mime_type']
+						ext = mime_type.split('/')[-1]
+						data = ContentFile(base64.b64decode(asset['data']))
+
+						def save_variant_asset():
+							variant.asset.save(f'variant_{variant_id}_image.{ext}', data, save=True)
+
+						retry_on_db_lock(save_variant_asset)
+					except Exception as e:
+						print(f"Warning: Failed to generate image for variant {variant_id} of post {post.post_id}: {e}")
+
+			except Exception as e:
+				print(f"Error generating variants for post {post.post_id}: {e}")
+				continue
+
+		print(f"Regenerated content generation complete for campaign {campaign_id}")
+
+	except Exception as e:
+		print(f"Error in background regenerated content generation: {e}")
+		import traceback
+		traceback.print_exc()
+
+	finally:
+		connection.close()
+
+
+class RegenerateStrategyAPIView(APIView):
+	"""
+	API endpoint for regenerating campaign strategy from a specific phase.
+
+	POST /api/agents/regenerate-strategy/
+	Request body:
+		{
+			"campaign_id": "campaign_1",
+			"phase_num": 2,  # Regenerate from Phase 2 onwards
+			"new_direction": "Focus more on developer communities"
+		}
+
+	Response:
+		{
+			"success": true,
+			"campaign_id": "campaign_1",
+			"new_version": 2,
+			"mermaid_diagram": "graph TB...",
+			"archived_posts": 5,
+			"new_posts": 6,
+			"message": "Strategy regenerated successfully"
+		}
+	"""
+
+	def post(self, request):
+		"""
+		Regenerate campaign strategy from a specific phase.
+
+		This endpoint:
+		1. Validates input (campaign_id, phase_num, new_direction)
+		2. Fetches campaign and existing posts
+		3. Archives posts from phase_num onwards (sets is_active=False)
+		4. Increments campaign.current_version
+		5. Calls strategy_planner.execute_from_phase() with:
+		   - existing posts from Phase 1 to Phase (phase_num-1)
+		   - new_direction prompt for regeneration
+		   - supports many-to-many connections between old and new posts
+		6. Parses returned Mermaid diagram using mermaid_parser.py
+		7. Creates new Post objects with version=campaign.current_version and is_active=True
+		8. Links posts: Adds connections from existing phase posts to new phase posts via next_posts M2M field
+		9. Updates campaign.strategy with new Mermaid diagram
+		10. Launches background thread for content generation (only for new posts with status='draft' and is_active=True)
+		11. Returns immediately with success status
+		"""
+		# Extract and validate input
+		campaign_id = request.data.get('campaign_id')
+		phase_num = request.data.get('phase_num')
+		new_direction = request.data.get('new_direction')
+
+		# Validation
+		if not campaign_id or not isinstance(campaign_id, str):
+			return Response(
+				{
+					"success": False,
+					"message": "Missing or invalid 'campaign_id' field. Must be a string."
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+		if phase_num is None or not isinstance(phase_num, int):
+			return Response(
+				{
+					"success": False,
+					"message": "Missing or invalid 'phase_num' field. Must be an integer."
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+		if phase_num < 1 or phase_num > 3:
+			return Response(
+				{
+					"success": False,
+					"message": "Invalid 'phase_num'. Must be between 1 and 3."
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+		if not new_direction or not isinstance(new_direction, str):
+			return Response(
+				{
+					"success": False,
+					"message": "Missing or invalid 'new_direction' field. Must be a string."
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+		try:
+			# Fetch campaign
+			try:
+				campaign = Campaign.objects.get(campaign_id=campaign_id)
+			except Campaign.DoesNotExist:
+				return Response(
+					{
+						"success": False,
+						"message": f"Campaign '{campaign_id}' not found."
+					},
+					status=status.HTTP_404_NOT_FOUND
+				)
+
+			with transaction.atomic():
+				# Get existing posts for phases before phase_num (to preserve)
+				phase_map = {1: 'Phase 1', 2: 'Phase 2', 3: 'Phase 3'}
+				phases_to_keep = [phase_map[i] for i in range(1, phase_num)]
+
+				existing_posts = list(
+					Post.objects.filter(
+						campaign=campaign,
+						is_active=True,
+						phase__in=phases_to_keep
+					).order_by('phase', 'post_id')
+				)
+
+				# Archive posts from phase_num onwards
+				posts_to_archive = Post.objects.filter(
+					campaign=campaign,
+					is_active=True,
+					phase__in=[phase_map[i] for i in range(phase_num, 4)]
+				)
+				archived_count = posts_to_archive.count()
+				posts_to_archive.update(is_active=False)
+
+				# Increment campaign version
+				campaign.current_version += 1
+				new_version = campaign.current_version
+				campaign.save(update_fields=['current_version', 'updated_at'])
+
+			# Build context for strategy planner from existing posts
+			# Format existing posts for execute_from_phase method
+			existing_posts_formatted = []
+			for post in existing_posts:
+				# Extract node_id from post_id (format: post_NODE1, post_NODE2, etc.)
+				node_id = post.post_id.replace('post_', '') if post.post_id.startswith('post_') else post.post_id
+				existing_posts_formatted.append({
+					'node_id': node_id,
+					'post_id': post.post_id,
+					'title': post.title,
+					'description': post.description,
+					'phase': post.phase
+				})
+
+			# Generate new strategy with strategy planner using execute_from_phase
+			strategy_agent = create_strategy_planner()
+
+			# Get GTM goals from campaign metadata
+			gtm_goals = campaign.metadata.get('gtm_goals', 'Launch product and grow user base')
+
+			strategy_output = strategy_agent.execute_from_phase(
+				phase_num=phase_num,
+				existing_posts=existing_posts_formatted,
+				product_description=campaign.description,
+				gtm_goals=gtm_goals,
+				new_direction=new_direction
+			)
+			mermaid_diagram = strategy_output.diagram
+
+			# Parse mermaid diagram
+			parsed_data = parse_mermaid_diagram(mermaid_diagram)
+			nodes = parsed_data['nodes']
+			connections = parsed_data['connections']
+
+			# Filter nodes to only include phases from phase_num onwards
+			new_nodes = [
+				node for node in nodes
+				if node['phase'] in [phase_map[i] for i in range(phase_num, 4)]
+			]
+
+			with transaction.atomic():
+				# Update campaign strategy
+				campaign.strategy = mermaid_diagram
+				campaign.save(update_fields=['strategy', 'updated_at'])
+
+				# Create new posts from new nodes
+				node_to_post = {}
+
+				# Map existing posts (for connections)
+				for post in existing_posts:
+					# Extract node ID from post_id if possible
+					# Assuming format: post_NODE1, post_NODE2, etc.
+					if post.post_id.startswith('post_'):
+						node_id = post.post_id.replace('post_', '')
+						node_to_post[node_id] = post
+
+				# Create new posts
+				for node in new_nodes:
+					post = Post.objects.create(
+						post_id=f"post_{node['id']}",
+						campaign=campaign,
+						title=node['title'],
+						description=node['description'],
+						phase=node['phase'] if node['phase'] in ['Phase 1', 'Phase 2', 'Phase 3'] else 'Phase 1',
+						status='draft',
+						version=new_version,
+						is_active=True
+					)
+					node_to_post[node['id']] = post
+
+				# Clear all next_posts relationships for existing posts
+				for post in existing_posts:
+					post.next_posts.clear()
+
+				# Re-establish connections based on new diagram
+				for connection in connections:
+					from_node = connection['from']
+					to_node = connection['to']
+
+					if from_node in node_to_post and to_node in node_to_post:
+						from_post = node_to_post[from_node]
+						to_post = node_to_post[to_node]
+						from_post.next_posts.add(to_post)
+
+			# Launch background content generation for new posts only
+			new_post_ids = [post.id for post in node_to_post.values() if post.version == new_version]
+
+			if new_post_ids:
+				regenerate_content_thread = threading.Thread(
+					target=regenerate_content_background,
+					args=(campaign_id, new_post_ids, campaign.description),
+					daemon=True
+				)
+				regenerate_content_thread.start()
+
+			return Response(
+				{
+					"success": True,
+					"campaign_id": campaign_id,
+					"new_version": new_version,
+					"mermaid_diagram": mermaid_diagram,
+					"archived_posts": archived_count,
+					"new_posts": len(new_nodes),
+					"message": f"Strategy regenerated successfully. Version {new_version} created."
+				},
+				status=status.HTTP_200_OK
+			)
+
+		except Exception as e:
+			import traceback
+			traceback.print_exc()
+			return Response(
+				{
+					"success": False,
+					"message": f"Error regenerating strategy: {str(e)}",
 					"error": str(e)
 				},
 				status=status.HTTP_500_INTERNAL_SERVER_ERROR

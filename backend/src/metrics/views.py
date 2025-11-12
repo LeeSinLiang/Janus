@@ -19,7 +19,7 @@ from django.db.utils import OperationalError
 
 # Create your views here.
 def getMetricsDB():
-	posts = Post.objects.filter(status="published").select_related('metrics')
+	posts = Post.objects.filter(status="published", is_active=True).select_related('metrics')
 	out = {}
 	for post in posts:
 		m = getattr(post, "metrics", None)
@@ -332,6 +332,7 @@ def checkTrigger(request):
 	# Filter published posts that have triggers configured
 	query = Post.objects.filter(
 		status="published",
+		is_active=True,
 		trigger_condition__isnull=False,
 		trigger_value__isnull=False,
 		trigger_comparison__isnull=False,
@@ -453,7 +454,7 @@ def nodesJSON(request):
 			"error": "No campaigns found"
 		}, status=404)
 
-	posts = Post.objects.filter(campaign=campaign)
+	posts = Post.objects.filter(campaign=campaign, is_active=True)
 	serializer = PostSerializer(posts, many=True)
 	metricsData = getMetricsDB()
 
@@ -466,7 +467,7 @@ def nodesJSON(request):
 	}
 
 	# Get first 4 published posts with metrics for the chart view
-	published_posts = Post.objects.filter(status="published").select_related('metrics').order_by('created_at')
+	published_posts = Post.objects.filter(status="published", is_active=True).select_related('metrics').order_by('created_at')
 	chartPosts = published_posts[:4]
 
 	post_metrics = []
@@ -792,7 +793,7 @@ def approveAllNodes(request):
 		campaign = Campaign.objects.get(campaign_id=campaign_id)
 
 		# Find all draft posts for this campaign
-		draft_posts = Post.objects.filter(campaign=campaign, status='draft')
+		draft_posts = Post.objects.filter(campaign=campaign, status='draft', is_active=True)
 
 		if not draft_posts.exists():
 			return Response({

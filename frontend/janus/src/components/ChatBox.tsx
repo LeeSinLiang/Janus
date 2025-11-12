@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Node } from '@xyflow/react';
-import { parseTrigger, sendMultiNodePrompt } from '@/services/api';
+import { parseTrigger, sendMultiNodePrompt, regenerateStrategy } from '@/services/api';
 import TypingText from './TypingText';
 
 interface RejectionState {
@@ -17,6 +17,7 @@ interface ChatBoxProps {
   onCancelRejection?: () => void;
   selectedNodeIds?: Set<string>;
   onMultiNodeSubmit?: () => void;
+  campaignId?: string;
 }
 
 export default function ChatBox({
@@ -25,7 +26,8 @@ export default function ChatBox({
   onRejectionSubmit,
   onCancelRejection,
   selectedNodeIds = new Set(),
-  onMultiNodeSubmit
+  onMultiNodeSubmit,
+  campaignId
 }: ChatBoxProps) {
   const [message, setMessage] = useState('');
   const [showMentionMenu, setShowMentionMenu] = useState(false);
@@ -188,6 +190,39 @@ export default function ChatBox({
         console.error('Failed to send multi-node prompt:', error);
       }
     } else {
+      // Check for !regenerate phase X <prompt> command
+      const regenerateRegex = /^!regenerate\s+phase\s+(\d+)\s+(.+)$/i;
+      const regenerateMatch = message.trim().match(regenerateRegex);
+
+      if (regenerateMatch && campaignId) {
+        const phaseNum = parseInt(regenerateMatch[1]);
+        const newDirection = regenerateMatch[2].trim();
+
+        // Validate phase number
+        if (phaseNum < 1 || phaseNum > 3) {
+          console.error('Invalid phase number. Must be 1, 2, or 3.');
+          setMessage('');
+          return;
+        }
+
+        try {
+          const result = await regenerateStrategy(campaignId, phaseNum, newDirection);
+          console.log(`Strategy regeneration started for Phase ${phaseNum}:`, result);
+
+          // Clear message on success
+          setMessage('');
+        } catch (error) {
+          console.error('Failed to regenerate strategy:', error);
+        }
+        return;
+      }
+
+      // Check for missing campaign ID when using !regenerate command
+      if (regenerateMatch && !campaignId) {
+        console.error('Cannot regenerate strategy without a campaign ID');
+        setMessage('');
+        return;
+      }
       // Normal message mode - parse for trigger in format: **NodeTitle** **condition** prompt
       // Extract all **text** patterns
       const boldTextMatches = message.match(/\*\*([^*]+)\*\*/g);

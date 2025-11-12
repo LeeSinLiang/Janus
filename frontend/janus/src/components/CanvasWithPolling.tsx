@@ -600,6 +600,7 @@ export default function CanvasWithPolling({ campaignId }: CanvasWithPollingProps
                 onCancelRejection={handleCancelRejection}
                 selectedNodeIds={selectedNodeIds}
                 onMultiNodeSubmit={handleMultiNodeSubmit}
+                campaignId={campaignId}
               />
             </div>
           </div>
