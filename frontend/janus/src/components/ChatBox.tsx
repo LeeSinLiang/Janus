@@ -32,9 +32,14 @@ export default function ChatBox({
   const [message, setMessage] = useState('');
   const [showMentionMenu, setShowMentionMenu] = useState(false);
   const [showCommandMenu, setShowCommandMenu] = useState(false);
+  const [showPhaseMenu, setShowPhaseMenu] = useState(false);
+  const [showThresholdMenu, setShowThresholdMenu] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mentionPosition, setMentionPosition] = useState(0);
   const [commandPosition, setCommandPosition] = useState(0);
+  const [phasePosition, setPhasePosition] = useState(0);
+  const [thresholdPosition, setThresholdPosition] = useState(0);
+  const [mentionedNodeTitle, setMentionedNodeTitle] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Typing animation state
@@ -68,10 +73,22 @@ export default function ChatBox({
 
   // Command options for / menu
   const commandOptions = [
-    { id: 'likes', label: 'Likes threshold', value: 'likes' },
-    { id: 'retweets', label: 'Retweets threshold', value: 'retweets' },
-    { id: 'impressions', label: 'Impressions threshold', value: 'impressions' },
-    { id: 'comments', label: 'Comments threshold', value: 'comments' },
+    { id: 'regenerate', label: 'Regenerate strategy from phase', value: 'regenerate' }
+  ];
+
+  // Phase options for /regenerate command
+  const phaseOptions = [
+    { id: 'phase1', label: 'Phase 1', value: '1' },
+    { id: 'phase2', label: 'Phase 2', value: '2' },
+    { id: 'phase3', label: 'Phase 3', value: '3' }
+  ];
+
+  // Threshold options for post-@ mention
+  const thresholdOptions = [
+    { id: 'likes', label: 'Likes', value: 'likes' },
+    { id: 'retweets', label: 'Retweets', value: 'retweets' },
+    { id: 'impressions', label: 'Impressions', value: 'impressions' },
+    { id: 'comments', label: 'Comments', value: 'comments' }
   ];
 
   // Handle @ and / detection
@@ -83,6 +100,49 @@ export default function ChatBox({
 
     const beforeCursor = value.slice(0, cursorPosition);
 
+    // Check for phase menu after /regenerate
+    const regeneratePhaseRegex = /\/regenerate\s+(?:phase\s*)?$/i;
+    if (regeneratePhaseRegex.test(beforeCursor)) {
+      const phaseKeywordIndex = beforeCursor.toLowerCase().lastIndexOf('phase');
+      setPhasePosition(phaseKeywordIndex !== -1 ? phaseKeywordIndex : beforeCursor.length);
+      setShowPhaseMenu(true);
+      setShowCommandMenu(false);
+      setShowMentionMenu(false);
+      setShowThresholdMenu(false);
+      setSelectedIndex(0);
+      return;
+    }
+
+    // Check for phase menu continuation (user is typing phase number)
+    const regeneratePhaseTypingRegex = /\/regenerate\s+phase\s+\d*$/i;
+    if (regeneratePhaseTypingRegex.test(beforeCursor)) {
+      const phaseKeywordIndex = beforeCursor.toLowerCase().lastIndexOf('phase');
+      setPhasePosition(phaseKeywordIndex + 'phase '.length);
+      setShowPhaseMenu(true);
+      setShowCommandMenu(false);
+      setShowMentionMenu(false);
+      setShowThresholdMenu(false);
+      setSelectedIndex(0);
+      return;
+    }
+
+    // Check for threshold menu after @NodeTitle
+    if (mentionedNodeTitle) {
+      const mentionPattern = new RegExp(`@${mentionedNodeTitle}\\s+(?!\\()([^\\s(]*)$`);
+      const thresholdMatch = beforeCursor.match(mentionPattern);
+
+      if (thresholdMatch) {
+        const thresholdStartIndex = beforeCursor.lastIndexOf(thresholdMatch[1]);
+        setThresholdPosition(thresholdStartIndex);
+        setShowThresholdMenu(true);
+        setShowCommandMenu(false);
+        setShowMentionMenu(false);
+        setShowPhaseMenu(false);
+        setSelectedIndex(0);
+        return;
+      }
+    }
+
     // Check for / command
     const lastSlashIndex = beforeCursor.lastIndexOf('/');
     if (lastSlashIndex !== -1) {
@@ -92,6 +152,8 @@ export default function ChatBox({
         setShowCommandMenu(true);
         setCommandPosition(lastSlashIndex);
         setShowMentionMenu(false);
+        setShowPhaseMenu(false);
+        setShowThresholdMenu(false);
         setSelectedIndex(0);
         return;
       }
@@ -101,33 +163,46 @@ export default function ChatBox({
     const lastAtIndex = beforeCursor.lastIndexOf('@');
     if (lastAtIndex !== -1) {
       const afterAt = beforeCursor.slice(lastAtIndex + 1);
-      // Show menu if @ is at the start or after a space, and no space after @
-      if ((lastAtIndex === 0 || beforeCursor[lastAtIndex - 1] === ' ') && !afterAt.includes(' ')) {
+      // Show menu if @ is at the start or after a space, and no space/( after @
+      if ((lastAtIndex === 0 || beforeCursor[lastAtIndex - 1] === ' ') && !afterAt.includes(' ') && !afterAt.includes('(')) {
         setShowMentionMenu(true);
         setMentionPosition(lastAtIndex);
         setShowCommandMenu(false);
+        setShowPhaseMenu(false);
+        setShowThresholdMenu(false);
         setSelectedIndex(0);
         return;
       }
     }
 
-    // Close both menus if neither condition is met
+    // Close all menus if no condition is met
     setShowMentionMenu(false);
     setShowCommandMenu(false);
+    setShowPhaseMenu(false);
+    setShowThresholdMenu(false);
   };
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Get filtered options based on current context
+    const beforeCursor = message.slice(0, textareaRef.current?.selectionStart || 0);
+
     if (showMentionMenu) {
+      const lastAtIndex = beforeCursor.lastIndexOf('@');
+      const afterAt = beforeCursor.slice(lastAtIndex + 1);
+      const filteredNodeOptions = nodeOptions.filter(node =>
+        node.title.toLowerCase().includes(afterAt.toLowerCase())
+      );
+
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % nodeOptions.length);
+        setSelectedIndex((prev) => (prev + 1) % filteredNodeOptions.length);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + nodeOptions.length) % nodeOptions.length);
+        setSelectedIndex((prev) => (prev - 1 + filteredNodeOptions.length) % filteredNodeOptions.length);
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        selectNode(nodeOptions[selectedIndex]);
+        selectNode(filteredNodeOptions[selectedIndex]);
       } else if (e.key === 'Escape') {
         setShowMentionMenu(false);
       }
@@ -135,17 +210,70 @@ export default function ChatBox({
     }
 
     if (showCommandMenu) {
+      const lastSlashIndex = beforeCursor.lastIndexOf('/');
+      const afterSlash = beforeCursor.slice(lastSlashIndex + 1);
+      const filteredCommandOptions = commandOptions.filter(cmd =>
+        cmd.label.toLowerCase().includes(afterSlash.toLowerCase()) ||
+        cmd.value.toLowerCase().includes(afterSlash.toLowerCase())
+      );
+
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % commandOptions.length);
+        setSelectedIndex((prev) => (prev + 1) % filteredCommandOptions.length);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + commandOptions.length) % commandOptions.length);
+        setSelectedIndex((prev) => (prev - 1 + filteredCommandOptions.length) % filteredCommandOptions.length);
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        selectCommand(commandOptions[selectedIndex]);
+        selectCommand(filteredCommandOptions[selectedIndex]);
       } else if (e.key === 'Escape') {
         setShowCommandMenu(false);
+      }
+      return;
+    }
+
+    if (showPhaseMenu) {
+      const afterPhase = message.slice(phasePosition);
+      const searchTerm = afterPhase.split(/[\s]/)[0];
+      const filteredPhaseOptions = phaseOptions.filter(opt =>
+        opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        opt.value.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % filteredPhaseOptions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + filteredPhaseOptions.length) % filteredPhaseOptions.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        selectPhase(filteredPhaseOptions[selectedIndex]);
+      } else if (e.key === 'Escape') {
+        setShowPhaseMenu(false);
+      }
+      return;
+    }
+
+    if (showThresholdMenu) {
+      const afterMention = message.slice(thresholdPosition);
+      const searchTerm = afterMention.split(/[\s(]/)[0];
+      const filteredThresholdOptions = thresholdOptions.filter(opt =>
+        opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        opt.value.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % filteredThresholdOptions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + filteredThresholdOptions.length) % filteredThresholdOptions.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        selectThreshold(filteredThresholdOptions[selectedIndex]);
+      } else if (e.key === 'Escape') {
+        setShowThresholdMenu(false);
       }
       return;
     }
@@ -190,8 +318,8 @@ export default function ChatBox({
         console.error('Failed to send multi-node prompt:', error);
       }
     } else {
-      // Check for !regenerate phase X <prompt> command
-      const regenerateRegex = /^!regenerate\s+phase\s+(\d+)\s+(.+)$/i;
+      // Check for /regenerate phase X <prompt> command
+      const regenerateRegex = /^\/regenerate\s+phase\s+(\d+)\s+(.+)$/i;
       const regenerateMatch = message.trim().match(regenerateRegex);
 
       if (regenerateMatch && campaignId) {
@@ -217,22 +345,24 @@ export default function ChatBox({
         return;
       }
 
-      // Check for missing campaign ID when using !regenerate command
+      // Check for missing campaign ID when using /regenerate command
       if (regenerateMatch && !campaignId) {
         console.error('Cannot regenerate strategy without a campaign ID');
         setMessage('');
         return;
       }
-      // Normal message mode - parse for trigger in format: **NodeTitle** **condition** prompt
-      // Extract all **text** patterns
-      const boldTextMatches = message.match(/\*\*([^*]+)\*\*/g);
 
-      if (boldTextMatches && boldTextMatches.length >= 2) {
-        // Extract node title (first bold text)
-        const nodeTitle = boldTextMatches[0].replace(/\*\*/g, '');
+      // Normal message mode - parse for trigger in format: @NodeTitle (condition) prompt
+      // Updated regex to support spaces in node titles using non-greedy match
+      const triggerRegex = /@([^(]+?)\s*\((\w+)\)\s*(.+)$/;
+      const triggerMatch = message.trim().match(triggerRegex);
 
-        // Extract condition (second bold text)
-        const condition = boldTextMatches[1].replace(/\*\*/g, '');
+      if (triggerMatch) {
+        const nodeTitle = triggerMatch[1].trim(); // Trim to remove trailing spaces
+        const condition = triggerMatch[2];
+        const prompt = triggerMatch[3].trim();
+
+        console.log('Trigger regex matched:', { nodeTitle, condition, prompt });
 
         // Validate condition is one of the allowed values
         const validConditions: Array<'likes' | 'retweets' | 'impressions' | 'comments'> = [
@@ -242,37 +372,37 @@ export default function ChatBox({
           'comments',
         ];
 
-        if (validConditions.includes(condition as any)) {
+        if (validConditions.includes(condition as 'likes' | 'retweets' | 'impressions' | 'comments')) {
           // Find node pk by title
           const node = nodeOptions.find(n => n.title === nodeTitle);
 
-          if (node) {
-            // Extract prompt (everything after the second **condition**)
-            const promptStartIndex = message.indexOf(boldTextMatches[1]) + boldTextMatches[1].length;
-            const prompt = message.slice(promptStartIndex).trim();
+          if (node && prompt) {
+            const nodePk = parseInt(node.id);
 
-            if (prompt) {
-              const nodePk = parseInt(node.id);
+            console.log(`Sending trigger to backend: pk=${nodePk}, condition=${condition}, prompt="${prompt}"`);
 
-              try {
-                const result = await parseTrigger(
-                  nodePk,
-                  condition as 'likes' | 'retweets' | 'impressions' | 'comments',
-                  prompt
-                );
-                console.log(`Trigger parsed and saved for node ${nodePk}:`, result);
-              } catch (error) {
-                console.error('Failed to parse trigger:', error);
-              }
-            } else {
-              console.log('No prompt provided after condition');
+            try {
+              const result = await parseTrigger(
+                nodePk,
+                condition as 'likes' | 'retweets' | 'impressions' | 'comments',
+                prompt
+              );
+              console.log(`✓ Trigger parsed and saved for node ${nodePk}:`, result);
+              setMessage('');
+              return;
+            } catch (error) {
+              console.error('✗ Failed to parse trigger:', error);
+              setMessage('');
+              return;
             }
           } else {
-            console.log(`Node with title "${nodeTitle}" not found`);
+            console.error('Trigger validation failed:', { node: node ? 'found' : 'NOT FOUND', hasPrompt: !!prompt });
           }
         } else {
-          console.log(`Invalid condition "${condition}". Must be one of: ${validConditions.join(', ')}`);
+          console.error('Invalid condition:', condition, 'Valid:', validConditions);
         }
+      } else {
+        console.log('Trigger regex did not match. Message:', message.trim());
       }
 
       setMessage('');
@@ -287,9 +417,15 @@ export default function ChatBox({
     // Remove any partial typing after @
     const cleanAfter = afterMention.replace(/^[^\s]*/, '');
 
-    const newMessage = `${beforeMention}**${node.title}** ${cleanAfter}`.trim() + ' ';
+    const newMessage = `${beforeMention}@${node.title} ${cleanAfter}`.trim() + ' ';
     setMessage(newMessage);
     setShowMentionMenu(false);
+
+    // Store node title and trigger threshold menu
+    setMentionedNodeTitle(node.title);
+    setThresholdPosition(beforeMention.length + node.title.length + 2); // Position after "@NodeTitle "
+    setShowThresholdMenu(true);
+    setSelectedIndex(0);
 
     // Focus back on textarea
     textareaRef.current?.focus();
@@ -303,11 +439,59 @@ export default function ChatBox({
     // Remove any partial typing after /
     const cleanAfter = afterCommand.replace(/^[^\s]*/, '');
 
-    const newMessage = `${beforeCommand}**${command.value}** ${cleanAfter}`.trim() + ' ';
-    setMessage(newMessage);
-    setShowCommandMenu(false);
+    if (command.value === 'regenerate') {
+      // For regenerate command, insert "/regenerate " and trigger phase menu
+      const newMessage = `${beforeCommand}/regenerate ${cleanAfter}`.trim() + ' ';
+      setMessage(newMessage);
+      setShowCommandMenu(false);
+
+      // Trigger phase menu
+      setPhasePosition(beforeCommand.length + '/regenerate '.length);
+      setShowPhaseMenu(true);
+      setSelectedIndex(0);
+    } else {
+      // For other commands (if any in future)
+      const newMessage = `${beforeCommand}/${command.value} ${cleanAfter}`.trim() + ' ';
+      setMessage(newMessage);
+      setShowCommandMenu(false);
+    }
 
     // Focus back on textarea
+    textareaRef.current?.focus();
+  };
+
+  // Select a phase from the menu
+  const selectPhase = (phase: { id: string; label: string; value: string }) => {
+    // Find where "/regenerate " ends
+    const regenerateIndex = message.lastIndexOf('/regenerate ');
+    if (regenerateIndex === -1) return;
+
+    const beforePhase = message.slice(0, regenerateIndex + '/regenerate '.length);
+    const afterPhase = message.slice(regenerateIndex + '/regenerate '.length);
+
+    // Remove any partial typing after phase keyword
+    const cleanAfter = afterPhase.replace(/^(?:phase\s*)?\d*/, '').trim();
+
+    const newMessage = `${beforePhase}phase ${phase.value} ${cleanAfter}`.trim() + ' ';
+    setMessage(newMessage);
+    setShowPhaseMenu(false);
+
+    textareaRef.current?.focus();
+  };
+
+  // Select a threshold from the menu
+  const selectThreshold = (threshold: { id: string; label: string; value: string }) => {
+    const beforeThreshold = message.slice(0, thresholdPosition);
+    const afterThreshold = message.slice(thresholdPosition);
+
+    // Remove any partial typing
+    const cleanAfter = afterThreshold.replace(/^[^\s]*/, '');
+
+    const newMessage = `${beforeThreshold}(${threshold.value}) ${cleanAfter}`.trim() + ' ';
+    setMessage(newMessage);
+    setShowThresholdMenu(false);
+    setMentionedNodeTitle(null);
+
     textareaRef.current?.focus();
   };
 
@@ -321,11 +505,17 @@ export default function ChatBox({
       if (showCommandMenu && textareaRef.current && !textareaRef.current.contains(target)) {
         setShowCommandMenu(false);
       }
+      if (showPhaseMenu && textareaRef.current && !textareaRef.current.contains(target)) {
+        setShowPhaseMenu(false);
+      }
+      if (showThresholdMenu && textareaRef.current && !textareaRef.current.contains(target)) {
+        setShowThresholdMenu(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMentionMenu, showCommandMenu]);
+  }, [showMentionMenu, showCommandMenu, showPhaseMenu, showThresholdMenu]);
 
   return (
     <div className="w-full px-6 py-4">
@@ -456,48 +646,127 @@ export default function ChatBox({
           />
 
           {/* Mention Menu */}
-          {showMentionMenu && nodeOptions.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-2 w-64 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg">
-              <div className="max-h-48 overflow-y-auto">
-                {nodeOptions.map((node, index) => (
-                  <button
-                    key={node.id}
-                    onClick={() => selectNode(node)}
-                    className={`w-full px-3 py-2 text-left text-sm transition-colors ${
-                      index === selectedIndex
-                        ? 'bg-blue-50 text-blue-900'
-                        : 'text-zinc-900 hover:bg-zinc-50'
-                    }`}
-                  >
-                    {node.title}
-                  </button>
-                ))}
+          {showMentionMenu && nodeOptions.length > 0 && (() => {
+            const beforeCursor = message.slice(0, textareaRef.current?.selectionStart || 0);
+            const lastAtIndex = beforeCursor.lastIndexOf('@');
+            const afterAt = beforeCursor.slice(lastAtIndex + 1);
+            const filteredNodeOptions = nodeOptions.filter(node =>
+              node.title.toLowerCase().includes(afterAt.toLowerCase())
+            );
+
+            return filteredNodeOptions.length > 0 ? (
+              <div className="absolute bottom-full left-0 mb-2 w-64 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg">
+                <div className="max-h-48 overflow-y-auto">
+                  {filteredNodeOptions.map((node, index) => (
+                    <button
+                      key={node.id}
+                      onClick={() => selectNode(node)}
+                      className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                        index === selectedIndex
+                          ? 'bg-blue-50 text-blue-900'
+                          : 'text-zinc-900 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {node.title}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            ) : null;
+          })()}
 
           {/* Command Menu */}
-          {showCommandMenu && commandOptions.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-2 w-48 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg">
-              <div className="max-h-48 overflow-y-auto">
-                {commandOptions.map((command, index) => (
-                  <button
-                    key={command.id}
-                    onClick={() => selectCommand(command)}
-                    className={`w-full px-3 py-2 text-left text-sm transition-colors ${
-                      index === selectedIndex
-                        ? 'bg-blue-50 text-blue-900'
-                        : 'text-zinc-900 hover:bg-zinc-50'
-                    }`}
-                  >
-                    {command.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {showCommandMenu && commandOptions.length > 0 && (() => {
+            const beforeCursor = message.slice(0, textareaRef.current?.selectionStart || 0);
+            const lastSlashIndex = beforeCursor.lastIndexOf('/');
+            const afterSlash = beforeCursor.slice(lastSlashIndex + 1);
+            const filteredCommandOptions = commandOptions.filter(cmd =>
+              cmd.label.toLowerCase().includes(afterSlash.toLowerCase()) ||
+              cmd.value.toLowerCase().includes(afterSlash.toLowerCase())
+            );
 
-          
+            return filteredCommandOptions.length > 0 ? (
+              <div className="absolute bottom-full left-0 mb-2 w-64 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg">
+                <div className="max-h-48 overflow-y-auto">
+                  {filteredCommandOptions.map((command, index) => (
+                    <button
+                      key={command.id}
+                      onClick={() => selectCommand(command)}
+                      className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                        index === selectedIndex
+                          ? 'bg-blue-50 text-blue-900'
+                          : 'text-zinc-900 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {command.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
+
+          {/* Phase Menu */}
+          {showPhaseMenu && phaseOptions.length > 0 && (() => {
+            const afterPhase = message.slice(phasePosition);
+            const searchTerm = afterPhase.split(/[\s]/)[0];
+            const filteredPhaseOptions = phaseOptions.filter(opt =>
+              opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              opt.value.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            return filteredPhaseOptions.length > 0 ? (
+              <div className="absolute bottom-full left-0 mb-2 w-48 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg">
+                <div className="max-h-48 overflow-y-auto">
+                  {filteredPhaseOptions.map((phase, index) => (
+                    <button
+                      key={phase.id}
+                      onClick={() => selectPhase(phase)}
+                      className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                        index === selectedIndex
+                          ? 'bg-blue-50 text-blue-900'
+                          : 'text-zinc-900 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {phase.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
+
+          {/* Threshold Menu */}
+          {showThresholdMenu && thresholdOptions.length > 0 && (() => {
+            const afterMention = message.slice(thresholdPosition);
+            const searchTerm = afterMention.split(/[\s(]/)[0];
+            const filteredThresholdOptions = thresholdOptions.filter(opt =>
+              opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              opt.value.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            return filteredThresholdOptions.length > 0 ? (
+              <div className="absolute bottom-full left-0 mb-2 w-48 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg">
+                <div className="max-h-48 overflow-y-auto">
+                  {filteredThresholdOptions.map((threshold, index) => (
+                    <button
+                      key={threshold.id}
+                      onClick={() => selectThreshold(threshold)}
+                      className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                        index === selectedIndex
+                          ? 'bg-blue-50 text-blue-900'
+                          : 'text-zinc-900 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {threshold.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
+
+
         </div>
       </div>
     </div>
